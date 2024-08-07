@@ -19,6 +19,13 @@ const config: Config = {
       fontFamily: {
         aggro: ['Aggro', 'sans-serif'],
       },
+      textShadow: {
+        'default': '2px 2px 4px #f8f8f8',
+        'lg': '3px 3px 6px #f8f8f8',
+        'xl': '4px 4px 8px #f8f8f8',
+        '2xl': '5px 5px 10px #f8f8f8',
+        'none': 'none',
+      }
       
     },
   },

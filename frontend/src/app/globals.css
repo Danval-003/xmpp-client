@@ -57,3 +57,24 @@ body {
   font-style: normal;
 }
 
+
+
+/* Estilo para la barra de desplazamiento en Chrome, Edge y Safari */
+::-webkit-scrollbar {
+  width: 6px; /* Ancho de la barra de desplazamiento */
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1a0; /* Color de la pista */
+  border-radius: 10px; /* Bordes redondeados para la pista */
+}
+
+::-webkit-scrollbar-thumb {
+  background: #888; /* Color del "pulgar" de la barra de desplazamiento */
+  border-radius: 10px; /* Bordes redondeados para el "pulgar" */
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #949494bf; /* Color del "pulgar" al pasar el ratón sobre él */
+}
+

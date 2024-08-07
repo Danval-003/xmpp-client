@@ -12,8 +12,8 @@ interface ParticlesProps {
 
 const Particles = ({
   className = '',
-  quantity = 50,
-  staticity = 50,
+  quantity = 200,
+  staticity = 200,
   ease = 50,
 }: ParticlesProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
