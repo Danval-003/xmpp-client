@@ -9,13 +9,13 @@ import pandas as pd
 
 
 # Crear instancia de ManagerXMPP
-xmpp_client = ManagerXMPP(username="testWeb2", fullname="Web Service", password="PSSWD")
+xmpp_client = ManagerXMPP(username="test2", fullname="Web Service", password="PSSWD")
 #xmpp_client.init_session()
 #xmpp_client.register()
 res = xmpp_client.init_session()
 #xmpp_client.obtain_users_filter()
 
-xmpp_client.add_contact("val21240@alumchat.lol")
+xmpp_client.add_contact("mnovella@alumchat.lol")
 
 # Enviar mensaje de prueba
 #xmpp_client.send_message("<message to='val21240@alumchat.lol' type='chat'><body>Hello, this is a test message.</body></message>")

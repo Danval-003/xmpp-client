@@ -22,20 +22,25 @@ def listen(manager: ManagerXMPP, queue: Queue):
                 chunk = manager.ssl_sock.recv(4096)
                 response += chunk
                 if len(chunk) < 4096:
-                    break
+                    try:
+                        response_decoded = response.decode('utf-8')
+                        dictS = parseXMLTOJSON(response_decoded)
+                        dictS = json.dumps(dictS, indent=4)
+                        break
+                    except Exception as e:
+                        print(f"Error en parseXMLTOJSON: {e}", response_decoded)
 
             response_decoded = response.decode('utf-8')
             
             if len(response) == 0:
                 continue
 
-            print(response_decoded) 
-            dictS = parseXMLTOJSON(response_decoded)
-            print(dictS)
-            
-            # Convertir diccionario a JSON
-            json_data = json.dumps(dictS, indent=4)
-            queue.put(json_data)
+            try:
+                dictS = parseXMLTOJSON(response_decoded)
+                dictS = json.dumps(dictS, indent=4)
+                queue.put(dictS)
+            except Exception as e:
+                print(f"Error en parseXMLTOJSON: {e}", response_decoded)
 
         except Exception as e:
             print(f"Error en listen: {e}")
@@ -80,7 +85,6 @@ async def send_periodic_messages(websocket: WebSocket):
                 if not QueueById.empty():
                     message = QueueById.get()
                     await websocket.send_text(message)
-            await asyncio.sleep(2)  # Espera de 2 segundos
         except Exception as e:
             print(f"Error al enviar mensaje: {e}")
             break
