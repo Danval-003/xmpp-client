@@ -1,114 +1,91 @@
 "use client";
 import React, { use, useEffect, useState } from "react";
-import { Spotlight, SpotlightCard, ChatWindow, UserListButton } from "@/app/components";
+import { Spotlight, SpotlightCard, ChatWindow, UserListButton, ContactListButton } from "@/app/components";
 import { useXMPP } from "@/app/context/XMPPContext";
+
 interface Contact {
   jid: string;
   name: string;
   status?: string;
-  active?: Number;
+  active?: number;
   imageBase64?: string;
 }
 
-const UserButton: React.FC<{ chat: Contact, className:string, onClick:()=>void }> = ({ chat, className, onClick }) => {
+const UserButton: React.FC<{ chat: Contact, className: string, onClick: () => void }> = ({ chat, className, onClick }) => {
   const status = () => {
-    if (chat.active === 1) {
-      if (chat.status === ""){
-        return "Online🟢";
-      }
-      return chat.status+"🟢";
-    } else if (chat.active === 0) {
-      if (chat.status === ""){
-        return "Offline🔴";
-      }
-      return chat.status+"🔴";
-    } else {
-      if (chat.name === ""){
-        return "";
-      }
-
-      return "Desconocido 🟡";
+    switch (chat.active) {
+      case 1:
+        return chat.status ? `${chat.status}🟢` : "Online🟢";
+      case 0:
+        return chat.status ? `${chat.status}🔴` : "Desconectado 🟣";
+      case 2:
+        return chat.status ? `${chat.status}⛔` : "Ocupado ⛔";
+      case 3:
+        return chat.status ? `${chat.status}🟠` : "Ausente 🟠";
+      case 4:
+        return chat.status ? `${chat.status}🟠` : "No disponible 🔴";
+      default:
+        return chat.name ? "Desconocido 🟡" : "";
     }
-  }
-
-  const [image, setImage] = useState<string>("");
-
-  useEffect(() => {
-    if (chat.imageBase64 !== '') {
-      setImage(`data:image/png;base64,${chat.imageBase64}`);
-    }
-  }, [chat.imageBase64]);
-
-
+  };
 
   return (
     <button className={`w-full text-white pl-5 pr-5 pt-4 pb-4 ${className}`} onClick={onClick}>
       <div className="flex gap-4">
-        {
-          chat.imageBase64 !== '' ? (
-            <img src={image} alt="User" className="w-12 h-12 rounded-full" />
-          ) : (
-            <div className="w-12 h-12 bg-slate-400 rounded-full" />
-          )
-        }
-        <div className="">
-          
-          <p className="text-slate-800 text-lg w-full text-start">{chat.name}</p>
-          <p className="text-slate-600 text-sm w-full text-start font-light">{
-            status()
-            }</p>
+        {chat.imageBase64 ? (
+          <img src={`data:image/png;base64,${chat.imageBase64}`} alt="User" className="w-12 h-12 rounded-full" />
+        ) : (
+          <div className="w-12 h-12 bg-[#333333] rounded-full" />
+        )}
+        <div className="flex flex-col content-center items-center justify-center">
+          <p className="text-[#1b1b1b] text-sm w-full text-start">{chat.name}</p>
+          <p className="text-[#333333] text-xs w-full text-start font-light">{status()}</p>
         </div>
       </div>
     </button>
   );
-}
-
+};
 
 const Principal: React.FC = () => {
   const { messages, sendMessage, chats, setChats } = useXMPP();
   const [To, setTo] = useState<string>("");
   const [ToContact, setToContact] = useState<Contact | null>(null);
-  const [Body, setBody] = useState<string>("");
-  const [actualChat, setActualChat] = useState<Contact | null >(null);
-  // Message interface
-  // Body -> Message body
-  // From -> Emisor
-  // To -> Receptor
-  // Type -> Type of message
-  // Id -> Message id
-
   const [usersNotTo, setUsersNotTo] = useState<Contact[]>([]);
 
+  useEffect(() => {
+    // Filter out chats with no messages
+    const chatsWithMessages = chats.filter(chat => 
+      messages.some(message => message.chat === chat.name)
+    );
+
+    const chatsWithoutTo = chatsWithMessages.filter((chat) => chat.name !== To);
+    const uniqueChats = Array.from(new Set(chatsWithoutTo.map((chat) => chat.name)))
+      .map((name) => chatsWithMessages.find((chat) => chat.name === name) || { jid: "", name: "" });
+    setUsersNotTo(uniqueChats);
+    console.log('Chats with messages and without to:', uniqueChats);
+  }, [To, chats, messages]);
 
   useEffect(() => {
-    const chatsWithoutTo = chats.filter((chat) => chat.name !== To);
-    // Delete duplicate chats find by name
-    const chatsWithoutToSet = new Set(chatsWithoutTo.map((chat) => chat.name));
-    // Set the new chats without the current chat
-    const chatsWithoutToUnique = Array.from(chatsWithoutToSet).map((name) => chats.find((chat) => chat.name === name) || { jid: "", name: "" });
-    setUsersNotTo(chatsWithoutToUnique);
-    console.log('Chats without to:', chatsWithoutToUnique);
-  }, [chats, To]);
+    console.log('Chats:', chats);
+  }, [chats]);
 
   useEffect(() => {
-    if(To === "" && chats.length > 0) {
+    if (To === "" && chats.length > 0) {
       setTo(chats[0].name || "");
       setToContact(chats[0]);
     }
   }, [chats]);
 
   useEffect(() => {
-    const chat = chats.find((chat) => chat.name === To);
-    setToContact(chat || null);
-  }, [To]);
+    setToContact(chats.find((chat) => chat.name === To) || null);
+  }, [To, chats]);
 
   useEffect(() => {
     console.log('Current messages:', messages);
   }, [messages]);
 
-  const addChat = (contact:Contact) => {
-    // Verify if not exist the chat
-    if (!chats.find((chat) => chat.jid === contact.jid)) {
+  const addChat = (contact: Contact) => {
+    if (!chats.some((chat) => chat.jid === contact.jid)) {
       console.log('Adding chat:', contact);
       setChats([...chats, contact]);
     }
@@ -120,30 +97,24 @@ const Principal: React.FC = () => {
     setToContact(chat);
   };
 
-
   return (
-    <div className="w-full h-full bg-chat-gradient font-aggro flex-col flex items-start justify-start">
-      <div className="h-full bg-[#A7C1D9] w-full flex">
+    <div className="w-full h-[100vh] bg-chat-gradient font-aggro flex-col flex items-start justify-start overflow-hidden">
+      <div className="h-[100vh] bg-[#CCEA8D] w-full flex overflow-hidden">
         <div className="w-3/12 h-full">
-          <div className="h-[90.6%] overflow-y-auto">
-            {
-              ToContact && (
-                <UserButton onClick={()=>{chandleChangeChat(ToContact)}} className="bg-slate-300" chat={ToContact} />
-              )
-            }
-            
-            
-            {
-              usersNotTo.map((chat, index) => (
-                <UserButton onClick={()=>{chandleChangeChat(chat)}} className="" key={index} chat={chat} />
-              ))
-            }
-
+          <div className="w-full h-[10.4%] bg-[#005148]">
+            <ContactListButton onClick={addChat} />
           </div>
-        {/* Part to add new other chat */}
-          <div className="w-full bg-[#23338C]">
+          <div className="h-[80.2%] overflow-y-auto">
+            {ToContact && (
+              <UserButton onClick={() => chandleChangeChat(ToContact)} className="bg-[#019587] shadow-lg" chat={ToContact} />
+            )}
+            {usersNotTo.map((chat, index) => (
+              <UserButton onClick={() => chandleChangeChat(chat)} className="" key={index} chat={chat} />
+            ))}
+          </div>
+          <div className="w-full h-[10.4%] bg-[#005148]">
             <UserListButton onClick={addChat} />
-          </div> 
+          </div>
         </div>
         <ChatWindow To={To} className="h-full w-9/12 bg-slate-100" />
       </div>

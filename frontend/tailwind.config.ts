@@ -12,9 +12,9 @@ const config: Config = {
         "gradient-radial": "radial-gradient(var(--tw-gradient-stops))",
         "gradient-conic":
           "conic-gradient(from 180deg at 50% 50%, var(--tw-gradient-stops))",
-        "custom-gradient": "linear-gradient(to right, #4b6cb7, #182848);",
+        "custom-gradient": "linear-gradient(to right, #019587, #005148);",
         "login-gradient": "linear-gradient(to right, #ffb347, #ffcc33);",
-        "chat-gradient": "linear-gradient(90deg, hsla(235, 100%, 78%, 1) 0%, hsla(222, 77%, 33%, 1) 100%);",
+        "chat-gradient": "linear-gradient(90deg, #F2D2B6 0%, #F2A663 100%);",
       },
       fontFamily: {
         aggro: ['Aggro', 'sans-serif'],

@@ -15,6 +15,7 @@ const LoginSection:React.FC<LoginSectionProps> = ({setIsLogin}) => {
   const { initiateConnection } = useXMPP();
 
   const handleLogin = () => {
+    console.log("Login");
     initiateConnection(username, password, "login");
   };
 
@@ -30,7 +31,7 @@ const LoginSection:React.FC<LoginSectionProps> = ({setIsLogin}) => {
             value={username}
             placeholder='Username'
             onChange={(e) => setUsername(e.target.value)}
-            className="w-full h-10 px-3 text-md bg-[#ececec29] text-[#f8f8f8] border border-[#f8f8f8] rounded-lg focus:outline-none focus:border-[#f8f8f8]"
+            className="w-full h-10 px-3 text-md bg-[#ececec29] text-[#f8f8f8] placeholder:text-[#ffffffe9] border border-[#f8f8f8] rounded-lg focus:outline-none focus:border-[#f8f8f8]"
           />
         </div>
         <div className="flex flex-col mt-5">
@@ -41,7 +42,7 @@ const LoginSection:React.FC<LoginSectionProps> = ({setIsLogin}) => {
             value={password}
             placeholder='Password'
             onChange={(e) => setPassword(e.target.value)}
-            className="w-full h-10 px-3 text-md bg-[#ececec29] text-[#f8f8f8] border border-[#f8f8f8] rounded-lg focus:outline-none focus:border-[#f8f8f8]"
+            className="w-full h-10 px-3 text-md bg-[#ececec29] text-[#f8f8f8] placeholder:text-[#ffffffe9] border border-[#f8f8f8] rounded-lg focus:outline-none focus:border-[#f8f8f8]"
           />
         </div>
         <button

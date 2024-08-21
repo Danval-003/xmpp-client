@@ -1,3 +1,4 @@
+import base64
 from fastapi import FastAPI, WebSocket
 import asyncio
 from typing import *
@@ -26,6 +27,7 @@ def listen(manager: ManagerXMPP, queue: Queue):
                         response_decoded = response.decode('utf-8')
                         dictS = parseXMLTOJSON(response_decoded)
                         dictS = json.dumps(dictS, indent=4)
+                        print('Parsed:', dictS)
                         break
                     except Exception as e:
                         print(f"Error en parseXMLTOJSON: {e}", response_decoded)
@@ -37,7 +39,41 @@ def listen(manager: ManagerXMPP, queue: Queue):
 
             try:
                 dictS = parseXMLTOJSON(response_decoded)
+                dictCopy = dictS.copy()
                 dictS = json.dumps(dictS, indent=4)
+                words = ['"iq"', '"@subscription"', '"@type": "set"']
+                otherWords = ['"presence"', '"@type": "subscribe"']
+                otherOtherWords = ['"iq"', '"@id": "upload_', '"@type": "result"']
+                otherOtherWords2 = ['"iq"', '"@id": "roster_contacts"']
+                isTr = True
+                for word in words:
+                    if word not in dictS:
+                        isTr = False
+                        break
+
+                isTr2 = False
+                for word in otherWords:
+                    if word in dictS:
+                        isTr2 = False
+                        break
+                isTr3 = True
+                for word in otherOtherWords:
+                    if not word in dictS:
+                        isTr3 = False
+                        break
+
+                isTr4 = True
+                for word in otherOtherWords2:
+                    if not word in dictS:
+                        isTr4 = False
+                        break
+
+                if isTr or isTr2:
+                    manager.obtain_roster_contacts()
+
+                if isTr3:
+                    manager.upload_file(dictCopy)
+
                 queue.put(dictS)
             except Exception as e:
                 print(f"Error en parseXMLTOJSON: {e}", response_decoded)
@@ -50,6 +86,7 @@ async def init_session(idWesock:int, data: Dict):
     managers[idWesock] = ManagerXMPP(username=data["username"], password=data["password"])
     queues[idWesock] = Queue()
     response = managers[idWesock].init_session()
+    
     if not response[0]:
         print("Error al iniciar sesión")
         response = {"error": "Error al iniciar sesión"}
@@ -57,6 +94,11 @@ async def init_session(idWesock:int, data: Dict):
         managers[idWesock].closeSession()
         clients[idWesock].close()
         return
+    managers[idWesock].obtain_server_time()
+    managers[idWesock].obtain_last_messages()
+    managers[idWesock].obtain_roster_contacts()
+    managers[idWesock].obtain_my_vcard()
+    await asyncio.sleep(4)
     managers[idWesock].obtain_users_filter()
     threading.Thread(target=listen, args=(managers[idWesock], queues[idWesock])).start()
 
@@ -73,6 +115,11 @@ async def register_user(idWesock:int, data: Dict):
         managers[idWesock].closeSession()
         clients[idWesock].close()
         return
+    managers[idWesock].obtain_server_time()
+    managers[idWesock].obtain_last_messages()
+    managers[idWesock].obtain_roster_contacts()
+    managers[idWesock].obtain_my_vcard()
+    await asyncio.sleep(4)
     managers[idWesock].obtain_users_filter()
     threading.Thread(target=listen, args=(managers[idWesock], queues[idWesock])).start()
 
@@ -85,12 +132,14 @@ async def send_periodic_messages(websocket: WebSocket):
                 if not QueueById.empty():
                     message = QueueById.get()
                     await websocket.send_text(message)
+
+            await asyncio.sleep(0.1)
         except Exception as e:
             print(f"Error al enviar mensaje: {e}")
             break
 
 async def listen_for_messages(websocket: WebSocket):
-    while True:
+    while hasattr(websocket, 'accept'):
         try:
             data = await websocket.receive_text()
             intWebSocket = id(websocket)
@@ -109,6 +158,53 @@ async def listen_for_messages(websocket: WebSocket):
             elif dataJson["type"] == "refreshUserlist":
                 if intWebSocket in managers:
                     managers[intWebSocket].obtain_users_filter()
+
+            elif dataJson["type"] == "disconnect":
+                if intWebSocket in managers:
+                    managers[intWebSocket].closeSession()
+                    del managers[intWebSocket]
+                    del queues[intWebSocket]
+                    websocket.close()
+                    websocket = None
+                    break
+            elif dataJson["type"] == "addContact":
+                if intWebSocket in managers and "contact" in dataJson:
+                    print("Añadir contacto")
+                    managers[intWebSocket].add_contact(dataJson["contact"])
+            elif dataJson["type"] == "acceptContact":
+                if intWebSocket in managers and "contact" in dataJson:
+                    managers[intWebSocket].accept_subscription(dataJson["contact"])
+            elif dataJson["type"] == "rejectContact":
+                if intWebSocket in managers and "contact" in dataJson:
+                    managers[intWebSocket].unsubscribe(dataJson["contact"])
+
+            elif dataJson["type"] == "deleteAccount":
+                if intWebSocket in managers:
+                    managers[intWebSocket].deleteAccount()
+                    managers[intWebSocket].closeSession()
+                    del managers[intWebSocket]
+                    del queues[intWebSocket]
+                    websocket.close()
+                    websocket = None
+                    break	
+            elif dataJson["type"] == "uploadProfilePicture":
+                if intWebSocket in managers and "file64" in dataJson and "filename" in dataJson:
+                    managers[intWebSocket].upload_profile_picture(dataJson['file64'], dataJson['filename'])
+
+            elif dataJson["type"] == "sendFile":
+                if intWebSocket in managers and "content" in dataJson and "filename" in dataJson and "to" in dataJson:
+                    # Parse content from str a bytes, not 64
+                    base64_content = dataJson['content']
+    
+                    # Decodificar base64 a bytes
+                    file_bytes = base64.b64decode(base64_content)
+
+                    managers[intWebSocket].file_message(to=dataJson['to'], file_bytes=file_bytes, filename=dataJson['filename']) 
+
+            elif dataJson["type"] == "obtainGroupChats":
+                if intWebSocket in managers:
+                    managers[intWebSocket].obtain_group_chats()
+            
                 
 
         except Exception as e:
@@ -117,6 +213,7 @@ async def listen_for_messages(websocket: WebSocket):
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
+    print("WebSocket conectado", websocket)
     await websocket.accept()
     idWebSocket = id(websocket)
     clients[idWebSocket] = websocket
@@ -125,6 +222,10 @@ async def websocket_endpoint(websocket: WebSocket):
     # Iniciar tareas asincrónicas para enviar y recibir mensajes
     send_task = asyncio.create_task(send_periodic_messages(websocket))
     listen_task = asyncio.create_task(listen_for_messages(websocket))
+
+    # Mandar mensaje inicial
+    initM = {'type': "Alredy connected"}
+    await websocket.send_text(json.dumps(initM))
 
     try:
         # Espera para permitir que las tareas se ejecuten

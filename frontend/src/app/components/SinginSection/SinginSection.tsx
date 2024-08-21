@@ -16,7 +16,7 @@ const RegisterSection: React.FC<RegisterSectionProps> = ({ setIsLogin }) => {
 
   const handleRegister = () => {
     console.log("Register");
-    register(username, password);
+    register(username, password, fullname);
     setIsLogin2(true);
     router.push("/chat");
   };
@@ -34,7 +34,7 @@ const RegisterSection: React.FC<RegisterSectionProps> = ({ setIsLogin }) => {
             placeholder='Username'
             value={username}
             onChange={(e) => setUsername(e.target.value)}
-            className="w-full h-10 px-3 text-md bg-[#ececec29] text-[#f8f8f8] border border-[#f8f8f8] rounded-lg focus:outline-none focus:border-[#f8f8f8]"
+            className="w-full h-10 px-3 text-md placeholder:text-[#ffffffe9] bg-[#ececec29] text-[#f8f8f8] border border-[#f8f8f8] rounded-lg focus:outline-none focus:border-[#f8f8f8]"
           />
         </div>
         <div className="flex flex-col mt-3">
@@ -45,7 +45,7 @@ const RegisterSection: React.FC<RegisterSectionProps> = ({ setIsLogin }) => {
             placeholder='Password'
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="w-full h-10 px-3 text-md bg-[#ececec29] text-[#f8f8f8] border border-[#f8f8f8] rounded-lg focus:outline-none focus:border-[#f8f8f8]"
+            className="w-full h-10 px-3 text-md placeholder:text-[#ffffffe9] bg-[#ececec29] text-[#f8f8f8] border border-[#f8f8f8] rounded-lg focus:outline-none focus:border-[#f8f8f8]"
           />
         </div>
         <div className="flex flex-col mt-3">
@@ -56,7 +56,7 @@ const RegisterSection: React.FC<RegisterSectionProps> = ({ setIsLogin }) => {
             placeholder='Fullname'
             value={fullname}
             onChange={(e) => setFullname(e.target.value)}
-            className="w-full h-10 px-3 text-md bg-[#ececec29] text-[#f8f8f8] border border-[#f8f8f8] rounded-lg focus:outline-none focus:border-[#f8f8f8]"
+            className="w-full h-10 px-3 text-md bg-[#ececec29] placeholder:text-[#ffffffe9] text-[#f8f8f8] border border-[#f8f8f8] rounded-lg focus:outline-none focus:border-[#f8f8f8]"
           />
         </div>
         <button type="button" className="w-full h-10 mt-5 bg-[#f8f8f8] text-[#333] font-bold uppercase rounded-lg hover:bg-[#e5e5e5] focus:outline-none"

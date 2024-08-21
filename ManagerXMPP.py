@@ -3,7 +3,9 @@ import ssl
 import threading
 from queue import Queue
 import base64
+import mimetypes
 import re
+import uuid
 import websockets
 import json
 import xml.etree.ElementTree as ET
@@ -12,12 +14,13 @@ from typing import *
 
 class ManagerXMPP:
     def __init__(self, username: str, password: str, fullname: str = ''):
-        self.username = "val21240-" + username
+        self.username = username
         self.fullname = fullname
         self.password = password
         self.server = "alumchat.lol"
         self.email = "val21240@uvg.edu.gt"
         self.jid = ""
+        self.filesToSend: Dict[str, Tuple[bytes, str]] = {}
 
         self.printCond = threading.Condition()
         
@@ -240,10 +243,6 @@ class ManagerXMPP:
         restart_stream = f"""<?xml version='1.0'?><stream:stream to='{self.server}' xmlns='jabber:client' xmlns:stream='http://etherx.jabber.org/streams' version='1.0'>"""
         response = self.send_andReceiveWithSSL(restart_stream)
         
-
-        # Link resource
-
-        # Session
         session = """<iq type='set' id='sess1'><session xmlns='urn:ietf:params:xml:ns:xmpp-session'/></iq>"""
         response = self.send_andReceiveWithSSL(session)
 
@@ -254,7 +253,7 @@ class ManagerXMPP:
 
         # Precense
         presence = """<presence/>"""
-        response = self.send_andReceiveWithSSL(presence)
+        response = self.send_message(presence)
 
 
     def obtain_users_filter(self, filter: str = "*"):
@@ -309,39 +308,14 @@ class ManagerXMPP:
         print("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
         print("Session started.")
 
-        iq = f"""<iq type='get' from='{self.jid}' to='{self.server}' id='roster_1'>
-        <query xmlns='jabber:iq:roster'/>
-        </iq>"""
-
-        def parse_roster_from_xml(xml_response):
-            contacts = []
-
-            # Expresiones regulares para extraer los campos de cada contacto
-            contact_pattern = re.compile(
-                r'<item jid="(.*?)" name="(.*?)"/>',
-                re.DOTALL
-            )
-
-            # Buscar todos los matches en la respuesta XML
-            matches = contact_pattern.findall(xml_response)
-
-            # Construir la lista de contactos
-            for match in matches:
-                contact = {
-                    'jid': match[0],
-                    'name': match[1]
-                }
-                contacts.append(contact)
-
-            return contacts
+        iq = f"""<iq id='roster_contacts'
+    type='get'>
+  <query xmlns='jabber:iq:roster'/>
+</iq>
+"""
 
         # Enviar la solicitud y recibir la respuesta
-        response = self.send_andReceiveWithSSL(iq)
-        print("Contacts:")
-        contacts = parse_roster_from_xml(response)
-        print(tabulate.tabulate(contacts, headers="keys"))
-
-        return contacts
+        self.send_message(iq)
     
     def obtainCorrectJID(self):
         iq = f"""<iq type='get' from='{self.username}@{self.server}/testWeb' to='{self.server}' id='roster_1'>
@@ -387,15 +361,51 @@ class ManagerXMPP:
 
     def add_contact(self, jid: str):
         # Enviar la solicitud de agregar contacto
-        iq = f"""<iq type='set' from='{self.jid}' id='add{self.contact_count}'>
-    <query xmlns='jabber:iq:roster'>
-        <item jid='{jid}' />
-    </query>
-    </iq>"""
+        iq = f"""<presence to='{jid}' type='subscribe'/>"""
         self.pendient_contacts[self.contact_count] = jid
         self.contact_count += 1
         response = self.send_message(iq)
         print(f"Add contact response: {response}")
+        self.obtain_roster_contacts()
+
+
+    def accept_subscription(self, jid: str):
+        # Enviar la solicitud de aceptar suscripción
+        precense = f"""<presence to='{jid}' type='subscribed'/>"""
+        self.send_message(precense)
+        self.add_contact(jid)
+        print(f"Accepted subscription from {jid}.")
+        self.obtain_roster_contacts()
+
+    def unsubscribe(self, jid: str):
+        # Enviar la solicitud de cancelar suscripción
+        precense = f"""<presence to='{jid}' type='unsubscribe'/>"""
+        self.send_message(precense)
+        # Remove from roster
+        iq = f"""<iq type='set' id='roster1'>
+    <query xmlns='jabber:iq:roster'>
+        <item jid='{jid}' subscription='remove'/>
+    </query>
+    </iq>"""
+        self.send_message(iq)
+        print(f"Unsubscribed from {jid}.")
+        self.obtain_roster_contacts()
+
+    def obtain_last_messages(self, jid = None):
+        # Enviar la solicitud de historial de mensajes using MAM
+        iq = f"""<iq type='set' from='{self.jid}' id='mam1'>
+    <query xmlns='urn:xmpp:mam:2' queryid='f27'>
+        <x xmlns='jabber:x:data' type='submit'>
+            <field var='FORM_TYPE' type='hidden'>
+                <value>urn:xmpp:mam:2</value>
+            </field>
+            {
+                f"<field var='with'><value>{jid}</value></field>" if jid else ""
+            }
+        </x>
+    </query>
+    </iq>"""
+        self.send_message(iq)
 
 
 
@@ -403,6 +413,91 @@ class ManagerXMPP:
         iq = f"""<iq type='set' id='reg2'><query xmlns='jabber:iq:register'><remove/></query></iq>"""
         self.send_message(iq)
         print("Account deleted.")
+
+    def obtain_server_time(self):
+        iq = f"""<iq type='get' from='{self.jid}' to='{self.server}' id='time1'>
+    <time xmlns='urn:xmpp:time'/>
+    </iq>"""
+        self.send_message(iq)
+
+
+    def file_message(self, to: str, file_bytes: bytes, filename: str):
+        print(f"Sending file: {filename}")
+
+        # Obtener el tamaño del archivo en bytes
+        file_size = len(file_bytes)
+        uuid_file = str(uuid.uuid4())
+
+        # Obtener el tipo MIME del archivo basado en su nombre
+        mime_type, _ = mimetypes.guess_type(filename)
+        if mime_type is None:
+            mime_type = "application/octet-stream"  # Tipo por defecto si no se puede determinar
+
+        # Construir el mensaje IQ para solicitar la URL de subida
+        iq_message = f"""<iq to="httpfileupload.alumchat.lol" type="get" id="upload_{uuid_file}">
+  <request xmlns="urn:xmpp:http:upload:0" filename="{filename}" size="{file_size}" content-type="{mime_type}"/>
+</iq>"""
+        print(f"Sending file upload request: {iq_message}")
+
+        # Enviar el mensaje IQ solicitando la URL de subida
+        self.send_message(iq_message)
+        self.filesToSend[uuid_file] = (file_bytes, to)
+
+
+    def upload_file(self, dictContent: dict):
+        print("Uploading file...")
+        url = dictContent["iq"]["slot"]["put"]["@url"]
+        id_ = dictContent["iq"]["@id"]
+        file_bytes, to = self.filesToSend[id_.replace("upload_", "", 1)]
+
+        import requests
+        response = requests.put(url, data=file_bytes, verify=False)
+
+        if response.status_code == 201:
+            print("File uploaded successfully")
+
+            # Construir el mensaje de
+            self.send_chat_message(f"{url}", to)
+
+        else:
+            print(f"Error uploading file: {response.status_code}")
+        
+
+
+
+    def upload_profile_picture(self, file_b64: str, filename: str):
+
+        # Create message
+        message = f"""<iq type='set' id='vcard2'>
+    <vCard xmlns='vcard-temp'>
+        <PHOTO>
+            <BINVAL>{file_b64}</BINVAL>
+            <TYPE>image/jpeg</TYPE>
+        </PHOTO>
+    </vCard>
+    </iq>"""
+        self.send_message(message)
+        print(f"Uploaded profile picture {filename}.")
+
+    # Obtain group chats
+    def obtain_group_chats(self):
+        iq = f"""<iq type='get' from='{self.jid}' to='conference.{self.server}' id='group_rooms'>
+    <query xmlns='http://jabber.org/protocol/disco#items'/>
+    </iq>"""
+        self.send_message(iq)
+
+    def obtain_my_vcard(self):
+        iq = f"""<iq type='get' id='personal_vcard'>
+    <query xmlns='vcard-temp'/>
+    </iq>"""
+        self.send_message(iq)
+
+    def obtain_vcard(self, jid: str):
+        iq = f"""<iq type='get' to='{jid}' id='vcard1'>
+        <query xmlns='vcard-temp'/>
+        </iq>"""
+
+        self.send_message(iq)
 
 
 import xmltodict
