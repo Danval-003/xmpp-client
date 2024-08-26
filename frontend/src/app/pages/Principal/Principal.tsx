@@ -9,6 +9,7 @@ interface Contact {
   status?: string;
   active?: number;
   imageBase64?: string;
+  group?: string;
 }
 
 const UserButton: React.FC<{ chat: Contact, className: string, onClick: () => void }> = ({ chat, className, onClick }) => {
@@ -29,6 +30,8 @@ const UserButton: React.FC<{ chat: Contact, className: string, onClick: () => vo
     }
   };
 
+  const isGroup = chat.jid.includes("@conference");
+
   return (
     <button className={`w-full text-white pl-5 pr-5 pt-4 pb-4 ${className}`} onClick={onClick}>
       <div className="flex gap-4">
@@ -38,8 +41,19 @@ const UserButton: React.FC<{ chat: Contact, className: string, onClick: () => vo
           <div className="w-12 h-12 bg-[#333333] rounded-full" />
         )}
         <div className="flex flex-col content-center items-center justify-center">
-          <p className="text-[#1b1b1b] text-sm w-full text-start">{chat.name}</p>
-          <p className="text-[#333333] text-xs w-full text-start font-light">{status()}</p>
+          {
+            isGroup ? (
+              <>
+              <p className="text-[#1b1b1b] text-sm w-full text-start">{chat.name}</p>
+              <p className="text-[#333333] text-xs w-full text-start font-light">{"Group chat"}</p>
+              </>
+            ) : (
+              <>
+              <p className="text-[#1b1b1b] text-sm w-full text-start">{chat.name}</p>
+              <p className="text-[#333333] text-xs w-full text-start font-light">{status()}</p>
+              </>
+            )
+          }
         </div>
       </div>
     </button>
@@ -51,6 +65,7 @@ const Principal: React.FC = () => {
   const [To, setTo] = useState<string>("");
   const [ToContact, setToContact] = useState<Contact | null>(null);
   const [usersNotTo, setUsersNotTo] = useState<Contact[]>([]);
+  const [TypeChat, setTypeChat] = useState<string>("");
 
   useEffect(() => {
     // Filter out chats with no messages
@@ -71,13 +86,27 @@ const Principal: React.FC = () => {
 
   useEffect(() => {
     if (To === "" && chats.length > 0) {
-      setTo(chats[0].name || "");
-      setToContact(chats[0]);
+      const chatsWithMessages = chats.filter(chat => 
+        messages.some(message => message.chat === chat.name)
+      );
+      if (chatsWithMessages.length > 0) {
+        setTo(chatsWithMessages[0].name);
+        setToContact(chatsWithMessages[0]);
+      } else {
+        setTo("");
+        setToContact(null);
+      }
     }
   }, [chats]);
 
   useEffect(() => {
-    setToContact(chats.find((chat) => chat.name === To) || null);
+    const ch = chats.find((chat) => chat.name === To) || null;
+    setToContact(ch);
+    if (ch?.jid.includes("@conference")) {
+      setTypeChat("groupchat");
+    } else {
+      setTypeChat("chat");
+    }
   }, [To, chats]);
 
   useEffect(() => {
@@ -90,12 +119,29 @@ const Principal: React.FC = () => {
       setChats([...chats, contact]);
     }
     setTo(contact.name);
+    if (contact.jid.includes("@conference")){
+      setTypeChat("groupchat");
+    } else {
+      setTypeChat("chat");
+    }
   };
 
   const chandleChangeChat = (chat: Contact) => {
     setTo(chat.name);
     setToContact(chat);
+    if (chat.jid.includes("@conference")){
+      setTypeChat("groupchat");
+    } else {
+      setTypeChat("chat");
+    }
   };
+
+  useEffect(() => {
+    const ch = chats.find((chat) => chat.name === To) || null;
+    console.log('Ch:', ch);
+    console.log('To:', To);
+    console.log("TypeChat:", TypeChat);
+  }, [To]);
 
   return (
     <div className="w-full h-[100vh] bg-chat-gradient font-aggro flex-col flex items-start justify-start overflow-hidden">
@@ -116,7 +162,7 @@ const Principal: React.FC = () => {
             <UserListButton onClick={addChat} />
           </div>
         </div>
-        <ChatWindow To={To} className="h-full w-9/12 bg-slate-100" />
+        <ChatWindow To={To} className="h-full w-9/12 bg-slate-100" TypeChat={TypeChat} addContact={addChat} />
       </div>
     </div>
   );

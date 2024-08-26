@@ -24,6 +24,7 @@
     "react-dom": "^18",
     "react-flickity-component": "^4.0.7",
     "react-pdf": "^9.1.0",
+    "react-toastify": "^10.0.5",
     "reconnecting-websocket": "^4.4.0",
     "stanza": "^12.20.0",
     "ws": "^8.18.0"

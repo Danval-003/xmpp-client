@@ -1,6 +1,10 @@
 'use client';
 import React, { createContext, useState, useContext, ReactNode, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import { group } from 'console';
+import { toast, ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
+
 
 interface Message {
   from: string;
@@ -10,7 +14,6 @@ interface Message {
   id: string;
   time: Date;
   chat: string;
-  file?: File;
 }
 
 interface XMPPContextProps {
@@ -21,7 +24,7 @@ interface XMPPContextProps {
   closeConnection: () => void;
   setIsLogin: React.Dispatch<React.SetStateAction<boolean>>;
   messages: Message[];
-  sendMessage: (To: string, Body: string) => void;
+  sendMessage: (To: string, Body: string, typechat:string) => void;
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
   chats: Contact[];
   setChats: React.Dispatch<React.SetStateAction<Contact[]>>;
@@ -30,7 +33,7 @@ interface XMPPContextProps {
   setLogged: React.Dispatch<React.SetStateAction<Number>>;
   actualUser: string;
   contacts: Contacts_[];
-  groupChats: GroupChat[];
+  groupChats: Contact[];
   addContact: (jid: string) => void;
   rejectContact: (jid: string) => void;
   acceptContact: (jid: string) => void;
@@ -39,7 +42,13 @@ interface XMPPContextProps {
   disconnect: () => void;
   deleteAccount: () => void;
   iam: Contact;
-  sendFile: (to: string, file: File) => void;
+  sendFile: (to: string, file: File, typechat:string) => void;
+  createChatRoom: (cf : ConfigRoom) => void;
+  sendPrecense: (to: string) => void;
+  updateChatsGroup: () => void;
+  updateUsers: () => void;
+  updateProfilePicture: (imageBase64: string, filename:string) => void;
+  updateStatus: (status_message: string, show: number) => void;
 }
 
 interface Users {
@@ -82,6 +91,12 @@ const XMPPContext = createContext<XMPPContextProps>({
     imageBase64: '',
   },
   sendFile: () => {},
+  createChatRoom: () => {},
+  sendPrecense: () => {},
+  updateChatsGroup: () => {},
+  updateUsers: () => {},
+  updateProfilePicture: () => {},
+  updateStatus: () => {},
 });
 
 interface Contact {
@@ -90,6 +105,7 @@ interface Contact {
   status?: string;
   active?: Number;
   imageBase64?: string;
+  group?: string;
 }
 
 interface XMPPProviderProps {
@@ -110,6 +126,20 @@ interface Contacts__ {
 interface GroupChat {
   jid: string;
   name: string;
+  
+}
+
+interface ConfigRoom {
+  name: string;
+  type: string;
+  config: {
+    nameroom: string;
+    description: string;
+    maxusers: number;
+    publicroom: 0|1;
+    allowinvites: 0|1;
+    enablelogging: 0|1;
+  }
 }
 
 interface Solicitudes {
@@ -127,7 +157,7 @@ export const XMPPProvider: React.FC<XMPPProviderProps> = ({ children }) => {
   const [Logged, setLogged] = useState<Number>(0);
   const [actualUser, setActualUser] = useState<string>('');
   const [contacts, setContacts] = useState<Contacts_[]>([]);
-  const [groupChats, setGroupChats] = useState<GroupChat[]>([]);
+  const [groupChats, setGroupChats] = useState<Contact[]>([]);
   const [permission, setPermission] = useState<string>("default");
   const [solContacts, setSolContacts] = useState<Solicitudes[]>([]);
   const [iam, setIam] = useState<Contact>(
@@ -146,9 +176,22 @@ export const XMPPProvider: React.FC<XMPPProviderProps> = ({ children }) => {
 
   // Funcion para hacer una notificación
   const notify = (title: string, body: string) => {
+    // toast
+    toast.info(`${title}: ${body}`, {
+      position: "top-right",
+      autoClose: 5000,
+      hideProgressBar: false,
+      closeOnClick: true,
+      pauseOnHover: true,
+      draggable: true,
+      progress: undefined,
+    });
+
     if (permission === 'granted') {
       new Notification(title, { body });
       console.log('Notification sent:', title, body);
+
+      
     }
   };
 
@@ -194,52 +237,48 @@ export const XMPPProvider: React.FC<XMPPProviderProps> = ({ children }) => {
         
     
         if (data.message) {
+          // Find regex [a-zA-Z0-9._-]+@conference\.alumchat\.lol
+          const toFindWithRegex = new RegExp("[a-zA-Z0-9._-]+@conference\.alumchat\.lol");
+          const concidences = message.data.match(toFindWithRegex);
+          if (concidences) {
+            concidences.forEach((element: string) => {
+              const newChatGroup = {
+                jid: element,
+                name: element.split('@')[0],
+                status: '',
+                active: 6,
+                imageBase64: '',
+              };
+              setGroupChats(prev => {
+                const existingChat = prev.find(chat => chat.name === newChatGroup.name.toLowerCase());
+                if (!existingChat) {
+                  return [...prev, newChatGroup];
+                }
+                return prev;
+              });
+            });
+          }
+
           if (data.message.body) {
-            let messageData: Message;
-            const from = data.message['@from'].split('@')[0];
+            const fromAddress = data.message['@from'].split('@')[1];
+            const typeS = fromAddress.includes("conference.alumchat.lol") ? "groupchat" : "chat";
+            const from = typeS !== "groupchat" ? data.message['@from'].split('@')[0] : data.message['@from'].split('/').at(-1);
             const isActualUser = from === actual;
 
-            if (data.message.file) {
-              const file = data.message.file.media;
-              const filename = file.filename;
-              const content_base64 = file.content;
-              const type = filename.split('.').pop();
-
-              // decode base64 to file
-              const byteCharacters = atob(content_base64);
-              const byteNumbers = new Array(byteCharacters.length);
-              for (let i = 0; i < byteCharacters.length; i++) {
-                byteNumbers[i] = byteCharacters.charCodeAt(i);
-              }
-              const byteArray = new Uint8Array(byteNumbers);
-              const blob = new File([byteArray], filename, { type: type });
+            
               // Add or update chat for message
-              messageData = {
+            const messageData = {
                 from,
                 body: data.message.body,
                 to: data.message['@to'],
                 type: data.message['@type'],
                 id: data.message['@id'],
                 time: new Date(),
-                chat: actual === from ? data.message['@to'].split('@')[0] : from,
-                file: blob,
+                chat: typeS === "groupchat" ? data.message['@from'].split('@')[0] : from === actual ? data.message['@to'].split('@')[0] : from,
               };
-
-            } else {
-              // Add or update chat for message
-              messageData = {
-                from,
-                body: data.message.body,
-                to: data.message['@to'],
-                type: data.message['@type'],
-                id: data.message['@id'],
-                time: new Date(),
-                chat: actual === from ? data.message['@to'].split('@')[0] : from,
-              };
-            }
     
             
-            console.log('Received message######:', messageData);
+            console.log('Received message######:', messageData, "Tipo", typeS);
     
             setMessages(prev => {
               const newMessages = [...prev, messageData];
@@ -256,15 +295,50 @@ export const XMPPProvider: React.FC<XMPPProviderProps> = ({ children }) => {
               setChats(prev => {
                 const existingChat = prev.find(chat => chat.name === from);
                 if (!existingChat) {
-                  // Add new chat if it does not exist
-                  return [...prev, {
-                    jid: data.message['@from'],
+                  
+                  const newChats = [...prev, {
+                    jid: from === actual ? data.message['@to'] : from,
                     name: from,
                     status: '',
                     active: 6,
                     imageBase64: '',
                   }];
+                  // Verify its chatgroup
+                  if (typeS === "groupchat") {
+                    // Verify if name of group is in Chats
+                    const existingChat = prev.find(chat => chat.name === data.message['@from'].split('@')[0]);
+                    if (!existingChat) {
+                      // Add new chat if it does not exist
+                      newChats.push({
+                        jid: data.message['@from'],
+                        name: data.message['@from'].split('@')[0],
+                        status: '',
+                        active: 6,
+                        imageBase64: '',
+                        group: data.message['@from'].split('@')[0],
+                      });
+                    }
+                    return newChats;
+                  }
+
                 }
+
+                // Verify its chatgroup
+                if (typeS === "groupchat") {
+                  // Verify if name of group is in Chats
+                  const existingChat = prev.find(chat => chat.name === data.message['@from'].split('@')[0]);
+                  if (!existingChat) {
+                    // Add new chat if it does not exist
+                    return [...prev, {
+                      jid: data.message['@from'],
+                      name: data.message['@from'].split('@')[0],
+                      status: '',
+                      active: 6,
+                      imageBase64: '',
+                    }];
+                  }
+                }
+
                 return prev;
               });
             }
@@ -301,57 +375,84 @@ export const XMPPProvider: React.FC<XMPPProviderProps> = ({ children }) => {
               const forwarded = data.message.result.forwarded;
               const serverTime = new Date(forwarded.delay['@stamp']);
               const adjustedTime = new Date(serverTime.getTime() + TimeDiff);
-              const from = forwarded.message['@from'].split('@')[0];
+              const fromAddress = data.message['@from'].split('@')[1];
+              const typeS = fromAddress.includes("conference.alumchat.lol") ? "groupchat" : "chat";
+              const from = typeS !== "groupchat" ? data.message['@from'].split('@')[0] : data.message['@from'].split('/').at(-1);
               const to = forwarded.message['@to'].split('@')[0];
               const isActualUser = from === actual || to === actual;
 
-              let messageData: Message;
-
-              if (forwarded.message.file) {
-                const file = forwarded.message.file.media;
-                const filename = file.filename;
-                const content_base64 = file.content;
-                const type = filename.split('.').pop();
-
-                // decode base64 to file
-                const byteCharacters = atob(content_base64);
-                const byteNumbers = new Array(byteCharacters.length);
-                for (let i = 0; i < byteCharacters.length; i++) {
-                  byteNumbers[i] = byteCharacters.charCodeAt(i);
-                }
-                const byteArray = new Uint8Array(byteNumbers);
-                const blob = new File([byteArray], filename, { type: type });
-                // Add or update chat for message
-                messageData = {
-                  from,
-                  body: forwarded.message.body,
-                  to,
-                  type: forwarded.message['@type'],
-                  id: forwarded.message['@id'],
-                  time: adjustedTime,
-                  chat: from === actual ? to : from,
-                  file: blob,
-                };
-              } else {
-                messageData = {
-                  from,
-                  body: forwarded.message.body,
-                  to,
-                  type: forwarded.message['@type'],
-                  id: forwarded.message['@id'],
-                  time: adjustedTime,
-                  chat: from === actual ? to : from,
-                };
+              if (typeS === "groupchat"){
+                sendPrecense(data.message['@from']);
               }
+
+              
+              const messageData = {
+                  from,
+                  body: forwarded.message.body,
+                  to,
+                  type: forwarded.message['@type'],
+                  id: forwarded.message['@id'],
+                  time: adjustedTime,
+                  chat: typeS === "groupchat" ? data.message['@from'].split('@')[0] : from === actual ? data.message['@to'].split('@')[0] : from,
+                };
+              
+              const userTochat = from === actual ? to : from;
+              // Add to chats
+              setChats(prev => {
+                const existingChat = prev.find(chat => chat.name === userTochat);
+                if (!existingChat) {
+                  
+                  const newChats = [...prev, {
+                    jid: from === actual ? to : from,
+                    name: userTochat,
+                    status: '',
+                    active: 6,
+                    imageBase64: '',
+                  }];
+                  // Verify its chatgroup
+                  if (typeS === "groupchat") {
+                    // Verify if name of group is in Chats
+                    const existingChat = prev.find(chat => chat.name === data.message['@from'].split('@')[0]);
+                    if (!existingChat) {
+                      // Add new chat if it does not exist
+                      newChats.push({
+                        jid: data.message['@from'],
+                        name: data.message['@from'].split('@')[0],
+                        status: '',
+                        active: 6,
+                        imageBase64: '',
+                        group: data.message['@from'].split('@')[0],
+                      });
+                    }
+                    return newChats;
+                  }
+
+                }
+
+                // Verify its chatgroup
+                if (typeS === "groupchat") {
+                  // Verify if name of group is in Chats
+                  const existingChat = prev.find(chat => chat.name === data.message['@from'].split('@')[0]);
+                  if (!existingChat) {
+                    // Add new chat if it does not exist
+                    return [...prev, {
+                      jid: data.message['@from'],
+                      name: data.message['@from'].split('@')[0],
+                      status: '',
+                      active: 6,
+                      imageBase64: '',
+                    }];
+                  }
+                }
+
+                return prev;
+              });
+
               console.log(
                 "Received old message:",
                 messageData,
                 actual
               )
-              if (messageData.file){
-                console.log("File --", messageData, actual)
-              }
-    
               
     
               console.log('Received message:', messageData);
@@ -374,6 +475,7 @@ export const XMPPProvider: React.FC<XMPPProviderProps> = ({ children }) => {
                         status: '',
                         active: 6,
                         imageBase64: '',
+                        group: typeS === "groupchat" ? data.message['@from'].split('@')[0] : null,
                       });
                     }
                   });
@@ -400,6 +502,13 @@ export const XMPPProvider: React.FC<XMPPProviderProps> = ({ children }) => {
                   return prev;
                 });
                 return;
+              } else if(data.presence['@type'] === 'error') {
+                console.log('Error:', data.presence.error);
+                if (data.presence.error) {
+                  if ('@code' in data.presence.error && data.presence.error.text ) {
+                    toast.error(`Error ${data.presence.error['@code']}: ${data.presence.error.text['#text']}`);
+                  }
+                }
               }
             }
 
@@ -474,11 +583,30 @@ export const XMPPProvider: React.FC<XMPPProviderProps> = ({ children }) => {
               return; 
             }
             const query = data.iq.query;
-            const groupChats: GroupChat[] = query.item.map((item: any) => ({
+            const groupChats: Contact[] = query.item.map((item: any) => ({
               jid: item['@jid'],
               name: item['@name'],
+              status: '',
+              active: 6,
+              imageBase64: '',
+              group: "asdasdasdasdasd",
             }));
-            setGroupChats(groupChats);
+            // Filter to not has duplicates with lowercase
+            const groupChatsFiltered = groupChats.filter((item, index, self) =>
+              index === self.findIndex((t) => (
+                t.name.toLowerCase() === item.name.toLowerCase()
+              ))
+            );
+            // Put names on lowercase
+            const groupChatsLower = groupChatsFiltered.map((item) => ({
+              jid: item.jid,
+              name: item.name.toLowerCase(),
+              status: item.status,
+              active: item.active,
+              imageBase64: item.imageBase64,
+              group: item.group,
+            }));
+            setGroupChats(groupChatsLower);
           } else if (data.iq['@id'] === "personal_vcard") {
             const iq_ = data.iq;
             if (iq_.vCard) {
@@ -490,6 +618,35 @@ export const XMPPProvider: React.FC<XMPPProviderProps> = ({ children }) => {
               // Update iam
               setIam(prev => ({ ...prev, imageBase64: image64 }));
             }
+          } else if (data.iq['@id'] === "group_rooms") {
+            if (data.iq['@type'] === "error") {
+              return; 
+            }
+            const query = data.iq.query;
+            const groupChats: Contact[] = query.item.map((item: any) => ({
+              jid: item['@jid'],
+              name: item['@name'],
+              status: '',
+              active: 6,
+              imageBase64: '',
+              group: "asdasdasdasdasd",
+            }));
+            // Filter to not has duplicates with lowercase
+            const groupChatsFiltered = groupChats.filter((item, index, self) =>
+              index === self.findIndex((t) => (
+                t.name.toLowerCase() === item.name.toLowerCase()
+              ))
+            );
+            // Put names on lowercase
+            const groupChatsLower = groupChatsFiltered.map((item) => ({
+              jid: item.jid,
+              name: item.name.toLowerCase(),
+              status: item.status,
+              active: item.active,
+              imageBase64: item.imageBase64,
+              group: item.group,
+            }));
+            setGroupChats(groupChatsLower);
           }
         } else if (data.error) {
           console.log('Error:', data.error);
@@ -547,24 +704,25 @@ export const XMPPProvider: React.FC<XMPPProviderProps> = ({ children }) => {
     });
   }
 
-  const sendFile = (to, file) => {
+  const sendFile = (to: string, file: File, typechat:string) => {
     // Decode file to base64
     const reader = new FileReader();
       reader.onload = () => {
-          // Convert the file content to base64
-          const base64File = reader.result?.split(',')[1];  // Omitimos la cabecera de "data:image/jpeg;base64,"
-
-          // Send base64 data to the server
-          const data = {
-              filename: file.name,
-              content: base64File,  // Send the base64 content
-              to: to,
-              type: 'sendFile',
-          };
-
-          if (connection) {
-              connection.send(JSON.stringify(data));  // Sending through a WebSocket or other connection
-          }
+        // Convert the file content to base64
+        const base64File = (reader.result as string)?.split(',')[1];  // Omitimos la cabecera de "data:image/jpeg;base64,"
+      
+        // Send base64 data to the server
+        const data = {
+          filename: file.name,
+          content: base64File,  // Send the base64 content
+          to: to,
+          type: 'sendFile',
+          typechat: typechat,
+        };
+      
+        if (connection) {
+          connection.send(JSON.stringify(data));  // Sending through a WebSocket or other connection
+        }
       };
       // Read the file as a data URL (base64)
       reader.readAsDataURL(file);
@@ -583,7 +741,12 @@ export const XMPPProvider: React.FC<XMPPProviderProps> = ({ children }) => {
     
     ws.onopen = () => {
       ws.send(JSON.stringify({ username, password, type: 'register', fullname }));
+      console.log('Connection opened');
       setConnection(ws);
+      setActualUser(username.toLowerCase());
+      actual = username.toLowerCase();
+      // Do strip
+      actual = actual.trim()
       setLogged(1);
     };
 
@@ -594,52 +757,48 @@ export const XMPPProvider: React.FC<XMPPProviderProps> = ({ children }) => {
         
     
         if (data.message) {
+          // Find regex [a-zA-Z0-9._-]+@conference\.alumchat\.lol
+          const toFindWithRegex = new RegExp("[a-zA-Z0-9._-]+@conference\.alumchat\.lol");
+          const concidences = message.data.match(toFindWithRegex);
+          if (concidences) {
+            concidences.forEach((element: string) => {
+              const newChatGroup = {
+                jid: element,
+                name: element.split('@')[0],
+                status: '',
+                active: 6,
+                imageBase64: '',
+              };
+              setGroupChats(prev => {
+                const existingChat = prev.find(chat => chat.name === newChatGroup.name.toLowerCase());
+                if (!existingChat) {
+                  return [...prev, newChatGroup];
+                }
+                return prev;
+              });
+            });
+          }
+
           if (data.message.body) {
-            let messageData: Message;
-            const from = data.message['@from'].split('@')[0];
+            const fromAddress = data.message['@from'].split('@')[1];
+            const typeS = fromAddress.includes("conference.alumchat.lol") ? "groupchat" : "chat";
+            const from = typeS !== "groupchat" ? data.message['@from'].split('@')[0] : data.message['@from'].split('/').at(-1);
             const isActualUser = from === actual;
 
-            if (data.message.file) {
-              const file = data.message.file.media;
-              const filename = file.filename;
-              const content_base64 = file.content;
-              const type = filename.split('.').pop();
-
-              // decode base64 to file
-              const byteCharacters = atob(content_base64);
-              const byteNumbers = new Array(byteCharacters.length);
-              for (let i = 0; i < byteCharacters.length; i++) {
-                byteNumbers[i] = byteCharacters.charCodeAt(i);
-              }
-              const byteArray = new Uint8Array(byteNumbers);
-              const blob = new File([byteArray], filename, { type: type });
+            
               // Add or update chat for message
-              messageData = {
+            const messageData = {
                 from,
                 body: data.message.body,
                 to: data.message['@to'],
                 type: data.message['@type'],
                 id: data.message['@id'],
                 time: new Date(),
-                chat: from,
-                file: blob,
+                chat: typeS === "groupchat" ? data.message['@from'].split('@')[0] : from === actual ? data.message['@to'].split('@')[0] : from,
               };
-
-            } else {
-              // Add or update chat for message
-              messageData = {
-                from,
-                body: data.message.body,
-                to: data.message['@to'],
-                type: data.message['@type'],
-                id: data.message['@id'],
-                time: new Date(),
-                chat: from,
-              };
-            }
     
             
-            console.log('Received message:', messageData);
+            console.log('Received message######:', messageData, "Tipo", typeS);
     
             setMessages(prev => {
               const newMessages = [...prev, messageData];
@@ -656,15 +815,50 @@ export const XMPPProvider: React.FC<XMPPProviderProps> = ({ children }) => {
               setChats(prev => {
                 const existingChat = prev.find(chat => chat.name === from);
                 if (!existingChat) {
-                  // Add new chat if it does not exist
-                  return [...prev, {
-                    jid: data.message['@from'],
+                  
+                  const newChats = [...prev, {
+                    jid: from === actual ? data.message['@to'] : from,
                     name: from,
                     status: '',
                     active: 6,
                     imageBase64: '',
                   }];
+                  // Verify its chatgroup
+                  if (typeS === "groupchat") {
+                    // Verify if name of group is in Chats
+                    const existingChat = prev.find(chat => chat.name === data.message['@from'].split('@')[0]);
+                    if (!existingChat) {
+                      // Add new chat if it does not exist
+                      newChats.push({
+                        jid: data.message['@from'],
+                        name: data.message['@from'].split('@')[0],
+                        status: '',
+                        active: 6,
+                        imageBase64: '',
+                        group: data.message['@from'].split('@')[0],
+                      });
+                    }
+                    return newChats;
+                  }
+
                 }
+
+                // Verify its chatgroup
+                if (typeS === "groupchat") {
+                  // Verify if name of group is in Chats
+                  const existingChat = prev.find(chat => chat.name === data.message['@from'].split('@')[0]);
+                  if (!existingChat) {
+                    // Add new chat if it does not exist
+                    return [...prev, {
+                      jid: data.message['@from'],
+                      name: data.message['@from'].split('@')[0],
+                      status: '',
+                      active: 6,
+                      imageBase64: '',
+                    }];
+                  }
+                }
+
                 return prev;
               });
             }
@@ -701,49 +895,84 @@ export const XMPPProvider: React.FC<XMPPProviderProps> = ({ children }) => {
               const forwarded = data.message.result.forwarded;
               const serverTime = new Date(forwarded.delay['@stamp']);
               const adjustedTime = new Date(serverTime.getTime() + TimeDiff);
-              const from = forwarded.message['@from'].split('@')[0];
+              const fromAddress = data.message['@from'].split('@')[1];
+              const typeS = fromAddress.includes("conference.alumchat.lol") ? "groupchat" : "chat";
+              const from = typeS !== "groupchat" ? data.message['@from'].split('@')[0] : data.message['@from'].split('/').at(-1);
               const to = forwarded.message['@to'].split('@')[0];
               const isActualUser = from === actual || to === actual;
 
-              let messageData: Message;
-
-              if (forwarded.message.file) {
-                const file = forwarded.message.file.media;
-                const filename = file.filename;
-                const content_base64 = file.content;
-                const type = filename.split('.').pop();
-
-                // decode base64 to file
-                const byteCharacters = atob(content_base64);
-                const byteNumbers = new Array(byteCharacters.length);
-                for (let i = 0; i < byteCharacters.length; i++) {
-                  byteNumbers[i] = byteCharacters.charCodeAt(i);
-                }
-                const byteArray = new Uint8Array(byteNumbers);
-                const blob = new File([byteArray], filename, { type: type });
-                // Add or update chat for message
-                messageData = {
-                  from,
-                  body: forwarded.message.body,
-                  to,
-                  type: forwarded.message['@type'],
-                  id: forwarded.message['@id'],
-                  time: adjustedTime,
-                  chat: from === actual ? to : from,
-                  file: blob,
-                };
-              } else {
-                messageData = {
-                  from,
-                  body: forwarded.message.body,
-                  to,
-                  type: forwarded.message['@type'],
-                  id: forwarded.message['@id'],
-                  time: adjustedTime,
-                  chat: from === actual ? to : from,
-                };
+              if (typeS === "groupchat"){
+                sendPrecense(data.message['@from']);
               }
-    
+
+              
+              const messageData = {
+                  from,
+                  body: forwarded.message.body,
+                  to,
+                  type: forwarded.message['@type'],
+                  id: forwarded.message['@id'],
+                  time: adjustedTime,
+                  chat: typeS === "groupchat" ? data.message['@from'].split('@')[0] : from === actual ? data.message['@to'].split('@')[0] : from,
+                };
+              
+              const userTochat = from === actual ? to : from;
+              // Add to chats
+              setChats(prev => {
+                const existingChat = prev.find(chat => chat.name === userTochat);
+                if (!existingChat) {
+                  
+                  const newChats = [...prev, {
+                    jid: from === actual ? to : from,
+                    name: userTochat,
+                    status: '',
+                    active: 6,
+                    imageBase64: '',
+                  }];
+                  // Verify its chatgroup
+                  if (typeS === "groupchat") {
+                    // Verify if name of group is in Chats
+                    const existingChat = prev.find(chat => chat.name === data.message['@from'].split('@')[0]);
+                    if (!existingChat) {
+                      // Add new chat if it does not exist
+                      newChats.push({
+                        jid: data.message['@from'],
+                        name: data.message['@from'].split('@')[0],
+                        status: '',
+                        active: 6,
+                        imageBase64: '',
+                        group: data.message['@from'].split('@')[0],
+                      });
+                    }
+                    return newChats;
+                  }
+
+                }
+
+                // Verify its chatgroup
+                if (typeS === "groupchat") {
+                  // Verify if name of group is in Chats
+                  const existingChat = prev.find(chat => chat.name === data.message['@from'].split('@')[0]);
+                  if (!existingChat) {
+                    // Add new chat if it does not exist
+                    return [...prev, {
+                      jid: data.message['@from'],
+                      name: data.message['@from'].split('@')[0],
+                      status: '',
+                      active: 6,
+                      imageBase64: '',
+                    }];
+                  }
+                }
+
+                return prev;
+              });
+
+              console.log(
+                "Received old message:",
+                messageData,
+                actual
+              )
               
     
               console.log('Received message:', messageData);
@@ -766,6 +995,7 @@ export const XMPPProvider: React.FC<XMPPProviderProps> = ({ children }) => {
                         status: '',
                         active: 6,
                         imageBase64: '',
+                        group: typeS === "groupchat" ? data.message['@from'].split('@')[0] : null,
                       });
                     }
                   });
@@ -792,11 +1022,18 @@ export const XMPPProvider: React.FC<XMPPProviderProps> = ({ children }) => {
                   return prev;
                 });
                 return;
+              } else if(data.presence['@type'] === 'error') {
+                console.log('Error:', data.presence.error);
+                if (data.presence.error) {
+                  if ('@code' in data.presence.error && data.presence.error.text ) {
+                    toast.error(`Error ${data.presence.error['@code']}: ${data.presence.error.text['#text']}`);
+                  }
+                }
               }
             }
 
 
-            let preces = data.presence.show === 'dnd' ? 2 : data.presence.show === 'xa' ? 4 : data.presence.show === 'away' ? 3 : 1;
+            let preces = data.presence.show === 'dnd' ? 2 : data.presence.show === 'xa' ? 4 : data.presence.show === 'away' ? 3 : data.presence.show === 'unavailable' ? 0 : 1;
             if (preces === 1) {
               if (data.presence['@type'] === 'unavailable') {
                 preces = 0;
@@ -824,6 +1061,15 @@ export const XMPPProvider: React.FC<XMPPProviderProps> = ({ children }) => {
                 return newChats;
               }
             });
+          } else {
+            setIam({
+              jid: data.presence['@from'],
+              name,
+              status: data.presence.status || '',
+              active: data.presence.show === 'dnd' ? 2 : data.presence.show === 'xa' ? 4 : data.presence.show === 'away' ? 3 : 1,
+              imageBase64: '',
+            });
+
           }
         } else if (data.iq) {
           if (data.iq['@id'] === "search1" && 'query' in data.iq) {
@@ -857,11 +1103,30 @@ export const XMPPProvider: React.FC<XMPPProviderProps> = ({ children }) => {
               return; 
             }
             const query = data.iq.query;
-            const groupChats: GroupChat[] = query.item.map((item: any) => ({
+            const groupChats: Contact[] = query.item.map((item: any) => ({
               jid: item['@jid'],
               name: item['@name'],
+              status: '',
+              active: 6,
+              imageBase64: '',
+              group: "asdasdasdasdasd",
             }));
-            setGroupChats(groupChats);
+            // Filter to not has duplicates with lowercase
+            const groupChatsFiltered = groupChats.filter((item, index, self) =>
+              index === self.findIndex((t) => (
+                t.name.toLowerCase() === item.name.toLowerCase()
+              ))
+            );
+            // Put names on lowercase
+            const groupChatsLower = groupChatsFiltered.map((item) => ({
+              jid: item.jid,
+              name: item.name.toLowerCase(),
+              status: item.status,
+              active: item.active,
+              imageBase64: item.imageBase64,
+              group: item.group,
+            }));
+            setGroupChats(groupChatsLower);
           } else if (data.iq['@id'] === "personal_vcard") {
             const iq_ = data.iq;
             if (iq_.vCard) {
@@ -873,6 +1138,35 @@ export const XMPPProvider: React.FC<XMPPProviderProps> = ({ children }) => {
               // Update iam
               setIam(prev => ({ ...prev, imageBase64: image64 }));
             }
+          } else if (data.iq['@id'] === "group_rooms") {
+            if (data.iq['@type'] === "error") {
+              return; 
+            }
+            const query = data.iq.query;
+            const groupChats: Contact[] = query.item.map((item: any) => ({
+              jid: item['@jid'],
+              name: item['@name'],
+              status: '',
+              active: 6,
+              imageBase64: '',
+              group: "asdasdasdasdasd",
+            }));
+            // Filter to not has duplicates with lowercase
+            const groupChatsFiltered = groupChats.filter((item, index, self) =>
+              index === self.findIndex((t) => (
+                t.name.toLowerCase() === item.name.toLowerCase()
+              ))
+            );
+            // Put names on lowercase
+            const groupChatsLower = groupChatsFiltered.map((item) => ({
+              jid: item.jid,
+              name: item.name.toLowerCase(),
+              status: item.status,
+              active: item.active,
+              imageBase64: item.imageBase64,
+              group: item.group,
+            }));
+            setGroupChats(groupChatsLower);
           }
         } else if (data.error) {
           console.log('Error:', data.error);
@@ -914,8 +1208,8 @@ export const XMPPProvider: React.FC<XMPPProviderProps> = ({ children }) => {
     }
   }
 
-  const sendMessage = (to: string, body: string) => {
-    const data = { to, body, type: 'message' };
+  const sendMessage = (to: string, body: string, typechat: string) => {
+    const data = { to, body, type: 'message', typechat };
     if (connection) {
       connection.send(JSON.stringify(data));
     }
@@ -940,6 +1234,43 @@ export const XMPPProvider: React.FC<XMPPProviderProps> = ({ children }) => {
     }
   }
 
+  const createChatRoom = (cf: ConfigRoom) => {
+    if (connection) {
+      cf.type = 'createGroupChat';
+      connection.send(JSON.stringify(cf));
+    }
+  }
+
+  const sendPrecense = (room_name: string) => {
+    if (connection) {
+      connection.send(JSON.stringify({ type: 'sendPrecense', to: room_name }));
+    }
+  }
+
+  const updateChatsGroup = () => {
+    if (connection) {
+      connection.send(JSON.stringify({ type: 'updateChatGroups' }));
+    }
+  }
+
+  const updateUsers = () => {
+    if (connection) {
+      connection.send(JSON.stringify({ type: 'updateUsers' }));
+    }
+  }
+
+  const updateProfilePicture = (imageBase64: string, filename:string) => {
+    if (connection) {
+      connection.send(JSON.stringify({ type: 'changeProfileImg', file64: imageBase64,  filename}));
+    }
+  }
+
+  const updateStatus = (status_message: string, show: number) => {
+    if (connection) {
+      connection.send(JSON.stringify({ type: 'changeStatus', status_message, show }));
+    }
+  }
+
   useEffect(() => {
     if(connection) {
       console.log('Current connection:', connection);
@@ -960,8 +1291,9 @@ export const XMPPProvider: React.FC<XMPPProviderProps> = ({ children }) => {
   }, [chats]);
 
   return (
-    <XMPPContext.Provider value={{ connection, isLogin, initiateConnection, closeConnection, setIsLogin, register, messages, sendMessage, setMessages, chats, setChats, userList, Logged, setLogged, actualUser, contacts, groupChats, addContact, rejectContact, acceptContact, solContacts, setSolContacts, disconnect, deleteAccount, iam, sendFile }}>
+    <XMPPContext.Provider value={{ connection, isLogin, initiateConnection, closeConnection, setIsLogin, register, messages, sendMessage, setMessages, chats, setChats, userList, Logged, setLogged, actualUser, contacts, groupChats, addContact, rejectContact, acceptContact, solContacts, setSolContacts, disconnect, deleteAccount, iam, sendFile, createChatRoom, sendPrecense, updateChatsGroup, updateUsers, updateProfilePicture, updateStatus }}>
       {children}
+      <ToastContainer />
     </XMPPContext.Provider>
   );
 };

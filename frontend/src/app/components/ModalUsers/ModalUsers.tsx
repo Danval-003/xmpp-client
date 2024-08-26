@@ -18,7 +18,7 @@ interface Contact {
 }
 
 const Modal: React.FC<{ isOpen: boolean; onClose: () => void; UserAction: (contact: Contact) => void }> = ({ isOpen, onClose, UserAction }) => {
-    const { userList, addContact } = useXMPP(); // `userList` es de tipo `Users[]`
+    const { userList, addContact, updateUsers } = useXMPP(); // `userList` es de tipo `Users[]`
     const [currentPage, setCurrentPage] = useState(1);
     const [searchTerm, setSearchTerm] = useState(""); // Estado para el término de búsqueda
     const [selectedUser, setSelectedUser] = useState<Users | null>(null);
@@ -43,60 +43,66 @@ const Modal: React.FC<{ isOpen: boolean; onClose: () => void; UserAction: (conta
                 </button>
 
                 {/* Campo de búsqueda */}
-                
-
                 {!selectedUser ? (
                     <>
-                    <input
-                    type="text"
-                    className="w-full p-3 mb-4 border rounded-md"
-                    placeholder="Buscar por JID..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    />
-                    <div>
-                        <table className="min-w-full divide-y divide-[#005148]">
-                            <thead className="bg-[#CCEA8D] text-[#01415B]">
-                                <tr>
-                                    <th className="px-4 py-2 text-left text-sm font-medium">Name</th>
-                                    <th className="px-4 py-2 text-left text-sm font-medium">Fullname</th>
-                                    <th className="px-4 py-2 text-left text-sm font-medium">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody className="bg-white divide-y divide-[#005148]">
-                                {paginatedUsers.map((user, index) => (
-                                    <tr key={index}>
-                                        <td className="px-4 py-2 text-sm text-[#005148]">{user.name}</td>
-                                        <td className="px-4 py-2 text-sm text-[#005148]">{user.fullname || 'N/A'}</td>
-                                        <td className="px-4 py-2 text-sm text-[#005148]">
-                                            <button
-                                                className="text-[#019587] hover:underline"
-                                                onClick={() => setSelectedUser({
-                                                    jid: user.jid,
-                                                    name: user.name,
-                                                    fullname: user.fullname,
-                                                    email: user.email
-                                                })}
-                                            >
-                                                Ver más
-                                            </button>
-                                        </td>
+                        <input
+                            type="text"
+                            className="w-full p-3 text-black mb-4 border rounded-md"
+                            placeholder="Buscar por JID..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                        />
+                        <div className="flex justify-end mb-4">
+                            <button
+                                className="px-4 py-2 bg-[#A6BC09] text-white rounded hover:bg-[#01415B]"
+                                onClick={updateUsers}
+                            >
+                                Actualizar Contactos
+                            </button>
+                        </div>
+                        <div>
+                            <table className="min-w-full divide-y divide-[#005148]">
+                                <thead className="bg-[#CCEA8D] text-[#01415B]">
+                                    <tr>
+                                        <th className="px-4 py-2 text-left text-sm font-medium">Name</th>
+                                        <th className="px-4 py-2 text-left text-sm font-medium">Fullname</th>
+                                        <th className="px-4 py-2 text-left text-sm font-medium">Actions</th>
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                                </thead>
+                                <tbody className="bg-white divide-y divide-[#005148]">
+                                    {paginatedUsers.map((user, index) => (
+                                        <tr key={index}>
+                                            <td className="px-4 py-2 text-sm text-[#005148]">{user.name}</td>
+                                            <td className="px-4 py-2 text-sm text-[#005148]">{user.fullname || 'N/A'}</td>
+                                            <td className="px-4 py-2 text-sm text-[#005148]">
+                                                <button
+                                                    className="text-[#019587] hover:underline"
+                                                    onClick={() => setSelectedUser({
+                                                        jid: user.jid,
+                                                        name: user.name,
+                                                        fullname: user.fullname,
+                                                        email: user.email
+                                                    })}
+                                                >
+                                                    Ver más
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
 
-                        {paginatedUsers.length < filteredUsers.length && (
-                            <div className="text-center mt-4">
-                                <button
-                                    className="px-4 py-2 bg-[#019587] text-white rounded hover:bg-[#005148]"
-                                    onClick={() => setCurrentPage(currentPage + 1)}
-                                >
-                                    Ver más
-                                </button>
-                            </div>
-                        )}
-                    </div>
+                            {paginatedUsers.length < filteredUsers.length && (
+                                <div className="text-center mt-4">
+                                    <button
+                                        className="px-4 py-2 bg-[#019587] text-white rounded hover:bg-[#005148]"
+                                        onClick={() => setCurrentPage(currentPage + 1)}
+                                    >
+                                        Ver más
+                                    </button>
+                                </div>
+                            )}
+                        </div>
                     </>
                 ) : (
                     <div>
@@ -150,7 +156,7 @@ const Modal: React.FC<{ isOpen: boolean; onClose: () => void; UserAction: (conta
 };
 
 // Componente principal
-const UserListButton: React.FC<{onClick: (contact: Contact) => void}> = ({onClick}) => {
+const UserListButton: React.FC<{ onClick: (contact: Contact) => void }> = ({ onClick }) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
 
     const openModal = () => setIsModalOpen(true);
@@ -164,14 +170,14 @@ const UserListButton: React.FC<{onClick: (contact: Contact) => void}> = ({onClic
                 Mostrar Usuarios 
             </button>
             <div className='pr-6'>
-            {
+                {
                     // Mostrar la cantidad de usuarios en un círculo
                     count > 0 && (
                         <span className="bg-[#CCEA8D] text-[#005148] text-xs rounded-full px-2 py-1 ml-2">
                             {count}
                         </span>
                     )
-            }
+                }
             </div>
             <Modal isOpen={isModalOpen} onClose={closeModal} UserAction={onClick} />
         </div>

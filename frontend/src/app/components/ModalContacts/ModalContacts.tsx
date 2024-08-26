@@ -89,7 +89,10 @@ const Modal: React.FC<{ isOpen: boolean; onClose: () => void; UserAction: (conta
                             </div>
                         )}
 
-                        <h2 className="text-xl text-[#01415B] font-bold mb-4 mt-8">Solicitudes de Seguimiento</h2>
+                        {
+                            solContacts.length > 0 && (
+                                <>
+                                <h2 className="text-xl text-[#01415B] font-bold mb-4 mt-8">Solicitudes de Seguimiento</h2>
                         <table className="min-w-full divide-y divide-[#005148]">
                             <thead className="bg-[#CCEA8D] text-[#01415B]">
                                 <tr>
@@ -99,7 +102,7 @@ const Modal: React.FC<{ isOpen: boolean; onClose: () => void; UserAction: (conta
                                 </tr>
                             </thead>
                             <tbody className="bg-white divide-y divide-[#005148]">
-                                {solContacts.map((solicitud, index) => (
+                                {solContacts.length > 0 ?   solContacts.map((solicitud, index) => (
                                     <tr key={index}>
                                         <td className="px-4 py-2 text-sm text-[#005148]">{solicitud.name}</td>
                                         <td className="px-4 py-2 text-sm text-[#005148]">{solicitud.status}</td>
@@ -124,9 +127,15 @@ const Modal: React.FC<{ isOpen: boolean; onClose: () => void; UserAction: (conta
                                             </button>
                                         </td>
                                     </tr>
-                                ))}
+                                )): (null)
+                        
+                            }
                             </tbody>
                         </table>
+                                </>
+                            )
+                        }
+                        
                     </div>
                 ) : (
                     <div>

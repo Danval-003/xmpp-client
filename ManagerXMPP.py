@@ -5,6 +5,7 @@ from queue import Queue
 import base64
 import mimetypes
 import re
+from time import sleep
 import uuid
 import websockets
 import json
@@ -21,6 +22,7 @@ class ManagerXMPP:
         self.email = "val21240@uvg.edu.gt"
         self.jid = ""
         self.filesToSend: Dict[str, Tuple[bytes, str]] = {}
+        self.precensed_groups = []
 
         self.printCond = threading.Condition()
         
@@ -52,6 +54,17 @@ class ManagerXMPP:
             self.messages.queue.clear()
 
         print("Connection closed.")
+
+    def precesenced_group(self, jid: str):
+        if not jid in self.precensed_groups:
+            self.precensed_groups.append(jid)
+            room_name = jid.split('@')[0]
+            message = f"""<presence to='{room_name}@conference.{self.server}/{self.username}'>
+        <x xmlns='http://jabber.org/protocol/muc'/>
+        </presence>
+        """
+            self.send_message(message)
+            print(f"Precesenced group {jid}.")
 
 
     def send_message(self, message):
@@ -204,8 +217,15 @@ class ManagerXMPP:
         except Exception as e:
             print(f"Error starting TLS: {e}")
 
-    def send_chat_message(self, message: str, to: str):
-        chat_message = f"""<message to='{to}@{self.server}' type='chat'><body>{message}</body></message>"""
+    def send_chat_message(self, message: str, to: str, type: str = 'chat'):
+        to_ = ""
+        if type == 'chat':
+            to_ = f"{to}@{self.server}"
+        else:
+            to_ = f"{to}@conference.{self.server}"
+            
+
+        chat_message = f"""<message to='{to_}' type='{type}'><body>{message}</body></message>"""
         self.send_message(chat_message)
         print(f"Sent message to {to}: {message}")
 
@@ -250,6 +270,12 @@ class ManagerXMPP:
             print("Session started successfully.")
         else:
             print("Session failed to start.")
+
+        
+        obtain_chats = f"""<iq type='get' from='{self.jid}' to='conference.{self.server}' id='group_rooms'>
+    <query xmlns='http://jabber.org/protocol/disco#items'/>
+    </iq>"""
+        self.send_message(obtain_chats)
 
         # Precense
         presence = """<presence/>"""
@@ -365,14 +391,23 @@ class ManagerXMPP:
         self.pendient_contacts[self.contact_count] = jid
         self.contact_count += 1
         response = self.send_message(iq)
+        
+        # Enviar la solicitud de aceptar suscripción
+        precense = f"""<presence to='{jid}' type='subscribed'/>"""
+        self.send_message(precense)
+
+        # Agregar al roster
+        iq = f"""<iq type='set' id='add_as'>
+    <query xmlns='jabber:iq:roster'>
+        <item jid='{jid}' name='{jid}'/>
+    </query>
+    </iq>"""
+        response = self.send_message(iq)
         print(f"Add contact response: {response}")
         self.obtain_roster_contacts()
 
 
     def accept_subscription(self, jid: str):
-        # Enviar la solicitud de aceptar suscripción
-        precense = f"""<presence to='{jid}' type='subscribed'/>"""
-        self.send_message(precense)
         self.add_contact(jid)
         print(f"Accepted subscription from {jid}.")
         self.obtain_roster_contacts()
@@ -421,7 +456,7 @@ class ManagerXMPP:
         self.send_message(iq)
 
 
-    def file_message(self, to: str, file_bytes: bytes, filename: str):
+    def file_message(self, to: str, file_bytes: bytes, filename: str, type_: str = 'chat'):
         print(f"Sending file: {filename}")
 
         # Obtener el tamaño del archivo en bytes
@@ -441,14 +476,14 @@ class ManagerXMPP:
 
         # Enviar el mensaje IQ solicitando la URL de subida
         self.send_message(iq_message)
-        self.filesToSend[uuid_file] = (file_bytes, to)
+        self.filesToSend[uuid_file] = (file_bytes, to, type_)
 
 
     def upload_file(self, dictContent: dict):
         print("Uploading file...")
         url = dictContent["iq"]["slot"]["put"]["@url"]
         id_ = dictContent["iq"]["@id"]
-        file_bytes, to = self.filesToSend[id_.replace("upload_", "", 1)]
+        file_bytes, to, type_ = self.filesToSend[id_.replace("upload_", "", 1)]
 
         import requests
         response = requests.put(url, data=file_bytes, verify=False)
@@ -457,7 +492,7 @@ class ManagerXMPP:
             print("File uploaded successfully")
 
             # Construir el mensaje de
-            self.send_chat_message(f"{url}", to)
+            self.send_chat_message(f"{url}", to, type_)
 
         else:
             print(f"Error uploading file: {response.status_code}")
@@ -478,6 +513,8 @@ class ManagerXMPP:
     </iq>"""
         self.send_message(message)
         print(f"Uploaded profile picture {filename}.")
+        sleep(1)
+        self.obtain_my_vcard()
 
     # Obtain group chats
     def obtain_group_chats(self):
@@ -485,6 +522,7 @@ class ManagerXMPP:
     <query xmlns='http://jabber.org/protocol/disco#items'/>
     </iq>"""
         self.send_message(iq)
+
 
     def obtain_my_vcard(self):
         iq = f"""<iq type='get' id='personal_vcard'>
@@ -498,6 +536,98 @@ class ManagerXMPP:
         </iq>"""
 
         self.send_message(iq)
+
+    def obtain_join_rooms(self):
+        iq = f"""<iq type='get' id='muc1' to='conference.{self.server}' xmlns='jabber:client'>
+  <query xmlns='http://jabber.org/protocol/muc#user'/>
+</iq>"""
+        self.send_message(iq)
+
+    def send_ping(self):
+        iq = f"""<iq type='get' id='ping1'>
+    <ping xmlns='urn:xmpp:ping'/>
+    </iq>"""
+        self.send_message(iq)
+
+    def create_group_chat(self, room_name: str):
+        # Crear el grupo
+        message = f"""<presence to='{room_name}@conference.{self.server}/{self.username}'>
+        <x xmlns='http://jabber.org/protocol/muc'/>
+        </presence>
+        """
+        self.send_message(message)
+        print(f"Group chat {room_name} created.")
+
+    def configure_group_chat(self, room_jid: str, config: dict):
+        # Configurar el grupo
+        fields = "\n".join([f"<field var='{key}' type='hidden'><value>{value}</value></field>" for key, value in config.items()])
+        
+        message = f"""<iq type='set' to='{room_jid}@conference.{self.server}' from='{self.username}@{self.server}' id='config1'>
+            <query xmlns='http://jabber.org/protocol/muc#owner'>
+                <x xmlns='jabber:x:data' type='submit'>
+                    <title>Room configuration</title>
+                    <instructions>The room &quot;{room_jid}&quot; has been created. To accept the default configuration, click the &quot;OK&quot; button. Or, modify the settings by completing the following form:</instructions>
+                    <field var='FORM_TYPE' type='hidden'>
+                        <value>http://jabber.org/protocol/muc#roomconfig</value>
+                    </field>
+                    {fields}
+                </x>
+            </query>
+        </iq>
+        """
+        self.send_message(message)
+        print(f"Configured group {room_jid}.")
+
+    def add_people_to_group(self, room_jid: str, jid: str, reason: str = ""):
+        # Añadir a la persona al grupo
+        message = f"""<message to='{jid}@{self.server}' id="invite_{room_jid}{jid}">
+            <x xmlns="jabber:x:conference" jid='{room_jid.lower()}@conference.{self.server}' />
+        </message>
+        """
+        self.send_message(message)
+        print(f"Added {jid} to group {room_jid}.")
+
+    def change_Precense(self, status_message: str, type: int):
+        """
+        Types of status:
+        1. Availible. 
+        3. away. 
+        4. Not Available
+        2. Busy
+        0. Offline
+        """
+        if type == 1:
+            precense = f"""<presence>
+            <show>chat</show>
+            <status>{status_message}</status></presence>"""
+        elif type == 2:
+            precense = f"""<presence>
+            <show>dnd</show>
+            <status>{status_message}</status></presence>"""
+        elif type == 3:
+            precense = f"""<presence>
+            <show>away</show>
+            <status>{status_message}</status></presence>"""
+        elif type == 4:
+            precense = f"""<presence>
+            <show>xa</show>
+            <status>{status_message}</status></presence>"""
+        elif type == 0:
+            precense = f"""<presence type='unavailable'/>"""
+        else:
+            precense = f"""<presence>
+            <show>chat</show>
+            <status>{status_message}</status></presence>"""
+
+        self.send_message(precense)
+
+        sleep(1)
+
+        self.obtain_my_vcard()
+
+
+
+
 
 
 import xmltodict

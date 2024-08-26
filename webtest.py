@@ -40,11 +40,13 @@ def listen(manager: ManagerXMPP, queue: Queue):
             try:
                 dictS = parseXMLTOJSON(response_decoded)
                 dictCopy = dictS.copy()
-                dictS = json.dumps(dictS, indent=4)
+                dictS:str = json.dumps(dictS, indent=4)
                 words = ['"iq"', '"@subscription"', '"@type": "set"']
                 otherWords = ['"presence"', '"@type": "subscribe"']
                 otherOtherWords = ['"iq"', '"@id": "upload_', '"@type": "result"']
                 otherOtherWords2 = ['"iq"', '"@id": "roster_contacts"']
+
+
                 isTr = True
                 for word in words:
                     if word not in dictS:
@@ -80,6 +82,16 @@ def listen(manager: ManagerXMPP, queue: Queue):
 
         except Exception as e:
             print(f"Error en listen: {e}")
+            break
+
+async def send_periodic_ping(idWebSocket: int):
+    manager = managers[idWebSocket]
+    while hasattr(manager, 'running'):
+        try:
+            manager.send_ping()
+            await asyncio.sleep(10)
+        except Exception as e:
+            print(f"Error al enviar ping: {e}")
             break
 
 async def init_session(idWesock:int, data: Dict):
@@ -153,7 +165,7 @@ async def listen_for_messages(websocket: WebSocket):
 
             elif dataJson["type"] == "message":
                 if intWebSocket in managers:
-                    managers[intWebSocket].send_chat_message(dataJson["body"] ,dataJson["to"])
+                    managers[intWebSocket].send_chat_message(dataJson["body"] ,dataJson["to"], dataJson["typechat"])
 
             elif dataJson["type"] == "refreshUserlist":
                 if intWebSocket in managers:
@@ -199,12 +211,52 @@ async def listen_for_messages(websocket: WebSocket):
                     # Decodificar base64 a bytes
                     file_bytes = base64.b64decode(base64_content)
 
-                    managers[intWebSocket].file_message(to=dataJson['to'], file_bytes=file_bytes, filename=dataJson['filename']) 
+                    managers[intWebSocket].file_message(to=dataJson['to'], file_bytes=file_bytes, filename=dataJson['filename'], type_=dataJson['typechat']) 
 
             elif dataJson["type"] == "obtainGroupChats":
                 if intWebSocket in managers:
                     managers[intWebSocket].obtain_group_chats()
+
+            elif dataJson["type"] == "createGroupChat":
+                if intWebSocket in managers and "name" in dataJson and "config" in dataJson:
+                    managers[intWebSocket].create_group_chat(dataJson['name'])
+                    configS = {}
+                    for configkey, value in dataJson['config'].items():
+                        if configkey == "description":
+                            configS["muc#roomconfig_roomdesc"] = value
+                        elif configkey == "maxusers":
+                            configS["muc#roomconfig_maxusers"] = value
+                        elif configkey == "publicroom":
+                            configS["muc#roomconfig_publicroom"] = value
+                        elif configkey == "allowinvites":
+                            configS["muc#roomconfig_allowinvites"] = value
+                        elif configkey == "enablelogging":
+                            configS["muc#roomconfig_enablelogging"] = value
+                        elif configkey == "nameroom":
+                            configS["muc#roomconfig_roomname"] = value
+
+                    managers[intWebSocket].configure_group_chat(dataJson['name'], configS)
+
+            elif dataJson["type"] == "sendPrecense":
+                if intWebSocket in managers and "to":
+                    managers[intWebSocket].precesenced_group(dataJson['to'])
+
+            elif dataJson["type"] == "updateChatGroups":
+                if intWebSocket in managers:
+                    managers[intWebSocket].obtain_group_chats()
             
+            elif dataJson["type"] == "updateUsers":
+                if intWebSocket in managers:
+                    managers[intWebSocket].obtain_users_filter()
+
+
+            elif dataJson["type"] == "changeProfileImg":
+                if intWebSocket in managers and "file64" in dataJson and "filename" in dataJson:
+                    managers[intWebSocket].upload_profile_picture(dataJson['file64'], dataJson['filename'])
+
+            elif dataJson["type"] == "changeStatus":
+                if intWebSocket in managers and ("status_message" in dataJson or "show" in dataJson):
+                    managers[intWebSocket].change_Precense(dataJson['status_message'], dataJson['show'])
                 
 
         except Exception as e:
@@ -245,3 +297,7 @@ async def websocket_endpoint(websocket: WebSocket):
         
         await websocket.close()
     
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="8000")

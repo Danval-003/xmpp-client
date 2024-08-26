@@ -4,16 +4,17 @@ from ManagerXMPP import ManagerXMPP, parseXMLTOJSON
 import xml.etree.ElementTree as ET
 from tabulate import tabulate
 import pandas as pd
+import base64  
 
 # cargar un archivo en bytes
-with open("retrato-perro-chihuahua-vestido-como-luchador-lucha-libre-mexicana-tradicional-mexico_655090-950396.jpg", "rb") as f:
+with open("2d035609483aad6a14b4b7a45223b32e.jpg", "rb") as f:
     data: bytes = f.read()
 
 
 
 
 # Crear instancia de ManagerXMPP
-xmpp_client = ManagerXMPP(username="val21240-testWeb", fullname="Web Service", password="PSSWD")
+xmpp_client = ManagerXMPP(username="val21240-test3", fullname="Web Service", password="PSSWD")
 #xmpp_client.init_session()
 #xmpp_client.register()
 res = xmpp_client.init_session()
@@ -22,7 +23,8 @@ res = xmpp_client.init_session()
 #xmpp_client.obtain_users_filter()
 #xmpp_client.obtain_server_time()
 #xmpp_client.obtain_group_chats()
-xmpp_client.upload_profile_picture( data, "retrato-perro-chihuahua-vestido-como-luchador-lucha-libre-mexicana-tradicional-mexico_655090-950396.jpg")
+data64 = base64.b64encode(data).decode('utf-8')
+xmpp_client.upload_profile_picture(data64 , "2d035609483aad6a14b4b7a45223b32e.jpg")
 
 #xmpp_client.obtain_last_messages()
 
