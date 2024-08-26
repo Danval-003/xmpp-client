@@ -492,6 +492,17 @@ export const XMPPProvider: React.FC<XMPPProviderProps> = ({ children }) => {
             if ('@type' in data.presence ) {
               if (data.presence['@type'] === 'unavailable') {
                 notify(`Usuario ${name} desconectado`, '');
+                // Update chat to unavailable
+                setChats(prev => {
+                  const existingChat = prev.find(chat => chat.name === name);
+                  if (existingChat) {
+                    const newChats = prev.map(chat =>
+                      chat.name === name ? { ...chat, active: 0 } : chat
+                    );
+                    return newChats;
+                  }
+                  return prev;
+                });
                 return;
               } else if (data.presence['@type'] === 'subscribe') {
                 notify(`Solicitud de ${name}`, 'Solicitud de contacto');
@@ -511,11 +522,24 @@ export const XMPPProvider: React.FC<XMPPProviderProps> = ({ children }) => {
                     toast.error(`Error ${data.presence.error['@code']}: ${data.presence.error.text['#text']}`);
                   }
                 }
+              } else if (data.presence['@type'] === 'chat') {
+                notify(`Usuario ${name} conectado`, '');
+                // Update chat to available
+                setChats(prev => {
+                  const existingChat = prev.find(chat => chat.name === name);
+                  if (existingChat) {
+                    const newChats = prev.map(chat =>
+                      chat.name === name ? { ...chat, active: 1 } : chat
+                    );
+                    return newChats;
+                  }
+                  return prev;
+                });
               }
             }
 
 
-            let preces = data.presence.show === 'dnd' ? 2 : data.presence.show === 'xa' ? 4 : data.presence.show === 'away' ? 3 : data.presence.show === 'unavailable' ? 0 : 1;
+            let preces = !data.presence.show ? 1: (data.presence.show === 'dnd' ? 2 : data.presence.show === 'xa' ? 4 : data.presence.show === 'away' ? 3 : data.presence.show === 'unavailable' ? 0 : 1);
             if (preces === 1) {
               if (data.presence['@type'] === 'unavailable') {
                 preces = 0;
@@ -523,6 +547,7 @@ export const XMPPProvider: React.FC<XMPPProviderProps> = ({ children }) => {
                 preces = 0;
               }
             }
+            
             const presenceData = {
               jid: data.presence['@from'],
               name,

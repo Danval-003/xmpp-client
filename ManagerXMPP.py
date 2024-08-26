@@ -635,6 +635,10 @@ class ManagerXMPP:
     </iq>"""
         self.send_message(message)
         print(f"Uploaded profile picture {filename}.")
+        presence_update = f"""<presence>
+<status/>
+</presence>"""
+        self.send_message(presence_update)
         sleep(1)
         self.obtain_my_vcard()
 
