@@ -1,3 +1,8 @@
+"""
+Author: Daniel Armando Valdez Reyes
+Date: 2024-08-25
+Description: This file contains the XMPP Manager.
+"""
 import socket
 import ssl
 import threading
