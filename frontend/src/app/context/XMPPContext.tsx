@@ -49,6 +49,7 @@ interface XMPPContextProps {
   updateUsers: () => void;
   updateProfilePicture: (imageBase64: string, filename:string) => void;
   updateStatus: (status_message: string, show: number) => void;
+  obtainRoster: () => void;
 }
 
 interface Users {
@@ -97,6 +98,7 @@ const XMPPContext = createContext<XMPPContextProps>({
   updateUsers: () => {},
   updateProfilePicture: () => {},
   updateStatus: () => {},
+  obtainRoster: () => {},
 });
 
 interface Contact {
@@ -571,13 +573,30 @@ export const XMPPProvider: React.FC<XMPPProviderProps> = ({ children }) => {
               return; 
             }
             const query = data.iq.query;
-            const contacts: Contacts_[] = query.item.map((item: Contacts__) => ({
-              jid: item['@jid'],
-              name: item['@jid'].split('@')[0],
-              type: item['@subscription'],
-            }));
 
-            setContacts(contacts);
+            // Verify if query.item exists
+            if (!query.item) {
+              setContacts([]);
+              return;
+            }
+
+            // Verify if query.item is an array
+            if (Array.isArray(query.item)) {
+              const contacts: Contacts_[] = query.item.map((item: Contacts__) => ({
+                jid: item['@jid'],
+                name: item['@jid'].split('@')[0],
+                type: item['@subscription'],
+              }));
+
+              setContacts(contacts);
+            } else {
+              const contacts: Contacts_[] = [{
+                jid: query.item['@jid'],
+                name: query.item['@jid'].split('@')[0],
+                type: query.item['@subscription'],
+              }];
+              setContacts(contacts);
+            }
           } else if (data.iq['@id'] === "group_rooms") {
             if (data.iq['@type'] === "error") {
               return; 
@@ -1091,13 +1110,30 @@ export const XMPPProvider: React.FC<XMPPProviderProps> = ({ children }) => {
               return; 
             }
             const query = data.iq.query;
-            const contacts: Contacts_[] = query.item.map((item: Contacts__) => ({
-              jid: item['@jid'],
-              name: item['@jid'].split('@')[0],
-              type: item['@subscription'],
-            }));
 
-            setContacts(contacts);
+            // Verify if query.item exists
+            if (!query.item) {
+              setContacts([]);
+              return;
+            }
+
+            // Verify if query.item is an array
+            if (Array.isArray(query.item)) {
+              const contacts: Contacts_[] = query.item.map((item: Contacts__) => ({
+                jid: item['@jid'],
+                name: item['@jid'].split('@')[0],
+                type: item['@subscription'],
+              }));
+
+              setContacts(contacts);
+            } else {
+              const contacts: Contacts_[] = [{
+                jid: query.item['@jid'],
+                name: query.item['@jid'].split('@')[0],
+                type: query.item['@subscription'],
+              }];
+              setContacts(contacts);
+            }
           } else if (data.iq['@id'] === "group_rooms") {
             if (data.iq['@type'] === "error") {
               return; 
@@ -1271,6 +1307,12 @@ export const XMPPProvider: React.FC<XMPPProviderProps> = ({ children }) => {
     }
   }
 
+  const obtainRoster = () => {
+    if (connection) {
+      connection.send(JSON.stringify({ type: 'obtainRoster' }));
+    }
+  }
+
   useEffect(() => {
     if(connection) {
       console.log('Current connection:', connection);
@@ -1291,7 +1333,7 @@ export const XMPPProvider: React.FC<XMPPProviderProps> = ({ children }) => {
   }, [chats]);
 
   return (
-    <XMPPContext.Provider value={{ connection, isLogin, initiateConnection, closeConnection, setIsLogin, register, messages, sendMessage, setMessages, chats, setChats, userList, Logged, setLogged, actualUser, contacts, groupChats, addContact, rejectContact, acceptContact, solContacts, setSolContacts, disconnect, deleteAccount, iam, sendFile, createChatRoom, sendPrecense, updateChatsGroup, updateUsers, updateProfilePicture, updateStatus }}>
+    <XMPPContext.Provider value={{ connection, isLogin, initiateConnection, closeConnection, setIsLogin, register, messages, sendMessage, setMessages, chats, setChats, userList, Logged, setLogged, actualUser, contacts, groupChats, addContact, rejectContact, acceptContact, solContacts, setSolContacts, disconnect, deleteAccount, iam, sendFile, createChatRoom, sendPrecense, updateChatsGroup, updateUsers, updateProfilePicture, updateStatus, obtainRoster }}>
       {children}
       <ToastContainer />
     </XMPPContext.Provider>

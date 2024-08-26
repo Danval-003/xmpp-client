@@ -24,7 +24,7 @@ interface Solicitudes {
 }
 
 const Modal: React.FC<{ isOpen: boolean; onClose: () => void; UserAction: (contact: Contact) => void }> = ({ isOpen, onClose, UserAction }) => {
-    const { contacts, acceptContact, addContact, rejectContact, solContacts, setSolContacts } = useXMPP(); // `contacts` es de tipo `Contacts[]`
+    const { contacts, acceptContact, addContact, rejectContact, solContacts, setSolContacts, obtainRoster } = useXMPP(); // `contacts` es de tipo `Contacts[]`
     const [currentPage, setCurrentPage] = useState(1);
     const [selectedContact, setSelectedContact] = useState<Contacts_ | null>(null);
     const contactsPerPage = 10;
@@ -47,7 +47,16 @@ const Modal: React.FC<{ isOpen: boolean; onClose: () => void; UserAction: (conta
 
                 {!selectedContact ? (
                     <div>
-                        <h2 className="text-xl text-[#01415B] font-bold mb-4">Contactos</h2>
+                        
+                        <div className="text-center p-3 flex justify-between">
+                            <h2 className="text-xl text-[#01415B] font-bold mb-4">Contactos</h2>
+                            <button
+                                className="px-4 py-2 bg-[#019587] text-white rounded hover:bg-[#005148]"
+                                onClick={() => obtainRoster()}
+                            >
+                                Actualizar
+                            </button>
+                        </div>
                         <table className="min-w-full divide-y divide-[#005148]">
                             <thead className="bg-[#CCEA8D] text-[#01415B]">
                                 <tr>

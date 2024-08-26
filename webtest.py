@@ -256,7 +256,11 @@ async def listen_for_messages(websocket: WebSocket):
 
             elif dataJson["type"] == "changeStatus":
                 if intWebSocket in managers and ("status_message" in dataJson or "show" in dataJson):
-                    managers[intWebSocket].change_Precense(dataJson['status_message'], dataJson['show'])
+                    managers[intWebSocket].change_Precense(dataJson['status_message'], int(dataJson['show']))
+
+            elif dataJson["type"] == "obtainRoster":
+                if intWebSocket in managers:
+                    managers[intWebSocket].obtain_roster_contacts()
                 
 
         except Exception as e:
