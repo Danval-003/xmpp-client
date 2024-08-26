@@ -15,6 +15,14 @@ from typing import *
 
 class ManagerXMPP:
     def __init__(self, username: str, password: str, fullname: str = ''):
+        """
+        Constructor for the XMPP Manager.
+        :param username: The username of the user.
+        :param password: The password of the user.
+        :param fullname: The full name of the user.
+        """
+
+
         self.username = username
         self.fullname = fullname
         self.password = password
@@ -37,6 +45,9 @@ class ManagerXMPP:
         self.pendient_contacts: Dict[int, str] = {}
 
     def __del__(self):
+        """
+        Destructor for the XMPP Manager.
+        """
         self.running = False
         self.printCond.acquire()
         self.printCond.notify_all()
@@ -56,6 +67,10 @@ class ManagerXMPP:
         print("Connection closed.")
 
     def precesenced_group(self, jid: str):
+        """
+        Precesence a group.
+        :param jid: The JID of the group.
+        """
         if not jid in self.precensed_groups:
             self.precensed_groups.append(jid)
             room_name = jid.split('@')[0]
@@ -68,6 +83,10 @@ class ManagerXMPP:
 
 
     def send_message(self, message):
+        """
+        Send a message to the server.
+        :param message: The message to send.
+        """
         try:
             print(f"Sending: {message}")
             self.ssl_sock.sendall(message.encode('utf-8'))
@@ -75,6 +94,10 @@ class ManagerXMPP:
             print(f"Error in send_message: {e}")
 
     def send_andReceive(self, message):
+        """
+        Send a message to the server and receive the response.
+        :param message: The message to send.
+        """
         self.sock.sendall(message.encode('utf-8'))
         response = b''
         while True:
@@ -93,6 +116,10 @@ class ManagerXMPP:
         return response_decoded
 
     def send_andReceiveWithSSL(self, message):
+        """
+        Send a message to the server and receive the response.
+        :param message: The message to send.
+        """
         self.send_message(message)
         response = b''
         while True:
@@ -111,6 +138,11 @@ class ManagerXMPP:
         return response_decoded
     
     def register(self) -> tuple[bool, str]:
+        """
+        Register a new user.
+        :return: A tuple with the result of the registration.
+        """
+
         initFlow = f"""<?xml version='1.0'?><stream:stream to='{self.server}' xmlns='jabber:client' xmlns:stream='http://etherx.jabber.org/streams' version='1.0'>"""
         print("-------------------------------------------------------")
         print("Sent initial stream.")
@@ -143,6 +175,10 @@ class ManagerXMPP:
         return True, "Registered successfully."
 
     def init_session(self) -> Tuple[bool, str]:
+        """
+        Initialize the XMPP session.
+        :return: A tuple with the result of the session initialization.
+        """
         try:
             init_stream = f"""<?xml version='1.0'?><stream:stream to='{self.server}' xmlns='jabber:client' xmlns:stream='http://etherx.jabber.org/streams' version='1.0'>"""
             self.sock.sendall(init_stream.encode('utf-8'))
@@ -185,6 +221,10 @@ class ManagerXMPP:
             print(f"Error initializing session: {e}")
 
     def start_tls(self) -> Tuple[bool, str]:
+        """
+        Start the TLS connection.
+        :return: A tuple with the result of the TLS connection.
+        """
         try:
             start_tls_message = "<starttls xmlns='urn:ietf:params:xml:ns:xmpp-tls'/>"
             self.sock.sendall(start_tls_message.encode('utf-8'))
@@ -218,6 +258,13 @@ class ManagerXMPP:
             print(f"Error starting TLS: {e}")
 
     def send_chat_message(self, message: str, to: str, type: str = 'chat'):
+        """
+        Send a chat message to a user.
+        :param message: The message to send.
+        :param to: The JID of the user to send the message to.
+        :param type: The type of the message.
+        """
+
         to_ = ""
         if type == 'chat':
             to_ = f"{to}@{self.server}"
@@ -230,6 +277,10 @@ class ManagerXMPP:
         print(f"Sent message to {to}: {message}")
 
     def authenticate(self) -> Tuple[bool, str]:
+        """
+        Authenticate the user.
+        :return: A tuple with the result of the authentication.
+        """
         auth_string = f'\0{self.username}\0{self.password}'
         auth_b64 = base64.b64encode(auth_string.encode()).decode()
         auth_message = f'<auth xmlns="urn:ietf:params:xml:ns:xmpp-sasl" mechanism="PLAIN">{auth_b64}</auth>'
@@ -260,6 +311,9 @@ class ManagerXMPP:
                 return False, "Authentication failed."
 
     def restart_flow(self):
+        """
+        Restart the XMPP flow.
+        """
         restart_stream = f"""<?xml version='1.0'?><stream:stream to='{self.server}' xmlns='jabber:client' xmlns:stream='http://etherx.jabber.org/streams' version='1.0'>"""
         response = self.send_andReceiveWithSSL(restart_stream)
         
@@ -283,6 +337,11 @@ class ManagerXMPP:
 
 
     def obtain_users_filter(self, filter: str = "*"):
+        """
+        Obtain the users with a filter.
+        :param filter: The filter to use.
+        """
+
         # Construir la solicitud de búsqueda con el filtro especificado
         iq = f"""<iq type='set' from='{self.username}@{self.server}/testWeb' to='search.alumchat.lol' id='search1' xml:lang='en'>
     <query xmlns='jabber:iq:search'>
@@ -310,12 +369,18 @@ class ManagerXMPP:
 
     
     def bind_resource(self):
+        """
+        Bind a resource.
+        """
         # Enviar la solicitud de bind
         iq_bind = f"""<iq type='set' id='bind1'><bind xmlns='urn:ietf:params:xml:ns:xmpp-bind'><resource>testWeb</resource></bind></iq>"""
         response = self.send_andReceiveWithSSL(iq_bind)
         print(f"Bind response: {response}")
 
     def auth(self):
+        """
+        Authenticate the user.
+        """
         # Auth
         auth_string = f'\0{self.username}\0{self.password}'
         auth_b64 = base64.b64encode(auth_string.encode()).decode()
@@ -324,12 +389,18 @@ class ManagerXMPP:
         print(f"Auth response: {response}")
 
     def start_session(self):
+        """ 
+        Start the session.
+        """
         # Enviar la solicitud de sesión
         iq_session = f"""<iq type='set' id='sess1'><session xmlns='urn:ietf:params:xml:ns:xmpp-session'/></iq>"""
         response = self.send_andReceiveWithSSL(iq_session)
         print(f"Session response: {response}")
 
     def obtain_roster_contacts(self):
+        """
+        Obtain the roster contacts.
+        """
 
         print("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
         print("Session started.")
@@ -344,6 +415,9 @@ class ManagerXMPP:
         self.send_message(iq)
     
     def obtainCorrectJID(self):
+        """
+        Obtain the correct JID.
+        """
         iq = f"""<iq type='get' from='{self.username}@{self.server}/testWeb' to='{self.server}' id='roster_1'>
     <query xmlns='jabber:iq:roster'/>
     </iq>"""
@@ -376,6 +450,10 @@ class ManagerXMPP:
         return contacts
     
     def closeSession(self):
+        """
+        Close the session.
+        """
+
         precense = f"""<presence type='unavailable' from="{self.username}@{self.server}/testWeb" to="{self.server}" />"""
         
         self.send_andReceiveWithSSL(precense)
@@ -386,6 +464,10 @@ class ManagerXMPP:
         self.__del__()
 
     def add_contact(self, jid: str):
+        """
+        Add a contact.
+        :param jid: The JID of the contact
+        """
         # Enviar la solicitud de agregar contacto
         iq = f"""<presence to='{jid}' type='subscribe'/>"""
         self.pendient_contacts[self.contact_count] = jid
@@ -408,11 +490,20 @@ class ManagerXMPP:
 
 
     def accept_subscription(self, jid: str):
+        """
+        Accept a subscription.
+        :param jid: The JID of the contact.
+        """
+
         self.add_contact(jid)
         print(f"Accepted subscription from {jid}.")
         self.obtain_roster_contacts()
 
     def unsubscribe(self, jid: str):
+        """
+        Unsubscribe from a contact.
+        :param jid: The JID of the contact.
+        """
         # Enviar la solicitud de cancelar suscripción
         precense = f"""<presence to='{jid}' type='unsubscribe'/>"""
         self.send_message(precense)
@@ -427,6 +518,11 @@ class ManagerXMPP:
         self.obtain_roster_contacts()
 
     def obtain_last_messages(self, jid = None):
+        """
+        Obtain the last messages.
+        :param jid: The JID of the contact.
+        """
+
         # Enviar la solicitud de historial de mensajes using MAM
         iq = f"""<iq type='set' from='{self.jid}' id='mam1'>
     <query xmlns='urn:xmpp:mam:2' queryid='f27'>
@@ -445,11 +541,17 @@ class ManagerXMPP:
 
 
     def deleteAccount(self):
+        """
+        Delete the account. 
+        """
         iq = f"""<iq type='set' id='reg2'><query xmlns='jabber:iq:register'><remove/></query></iq>"""
         self.send_message(iq)
         print("Account deleted.")
 
     def obtain_server_time(self):
+        """
+        Obtain the server time.
+        """
         iq = f"""<iq type='get' from='{self.jid}' to='{self.server}' id='time1'>
     <time xmlns='urn:xmpp:time'/>
     </iq>"""
@@ -457,6 +559,13 @@ class ManagerXMPP:
 
 
     def file_message(self, to: str, file_bytes: bytes, filename: str, type_: str = 'chat'):
+        """
+        Send a file message.
+        :param to: The JID of the contact.
+        :param file_bytes: The bytes of the file.
+        :param filename: The name of the file.
+        :param type_: The type of the message.
+        """
         print(f"Sending file: {filename}")
 
         # Obtener el tamaño del archivo en bytes
@@ -480,6 +589,10 @@ class ManagerXMPP:
 
 
     def upload_file(self, dictContent: dict):
+        """
+        Upload a file.
+        :param dictContent: The content of the file.
+        """
         print("Uploading file...")
         url = dictContent["iq"]["slot"]["put"]["@url"]
         id_ = dictContent["iq"]["@id"]
@@ -501,7 +614,11 @@ class ManagerXMPP:
 
 
     def upload_profile_picture(self, file_b64: str, filename: str):
-
+        """
+        Upload a profile picture.
+        :param file_b64: The base64 of the file.
+        :param filename: The name of the file.
+        """
         # Create message
         message = f"""<iq type='set' id='vcard2'>
     <vCard xmlns='vcard-temp'>
@@ -518,6 +635,9 @@ class ManagerXMPP:
 
     # Obtain group chats
     def obtain_group_chats(self):
+        """
+        Obtain the group chats.
+        """
         iq = f"""<iq type='get' from='{self.jid}' to='conference.{self.server}' id='group_rooms'>
     <query xmlns='http://jabber.org/protocol/disco#items'/>
     </iq>"""
@@ -525,12 +645,18 @@ class ManagerXMPP:
 
 
     def obtain_my_vcard(self):
+        """
+        Obtain the vcard of the user.
+        """
         iq = f"""<iq type='get' id='personal_vcard'>
     <query xmlns='vcard-temp'/>
     </iq>"""
         self.send_message(iq)
 
     def obtain_vcard(self, jid: str):
+        """
+        Obtain the vcard of a user.
+        """
         iq = f"""<iq type='get' to='{jid}' id='vcard1'>
         <query xmlns='vcard-temp'/>
         </iq>"""
@@ -538,18 +664,28 @@ class ManagerXMPP:
         self.send_message(iq)
 
     def obtain_join_rooms(self):
+        """
+        Obtain the rooms to join.
+        """
         iq = f"""<iq type='get' id='muc1' to='conference.{self.server}' xmlns='jabber:client'>
   <query xmlns='http://jabber.org/protocol/muc#user'/>
 </iq>"""
         self.send_message(iq)
 
     def send_ping(self):
+        """
+        Send a ping.
+        """
         iq = f"""<iq type='get' id='ping1'>
     <ping xmlns='urn:xmpp:ping'/>
     </iq>"""
         self.send_message(iq)
 
     def create_group_chat(self, room_name: str):
+        """
+        Create a group chat.
+        :param room_name: The name of the group chat.
+        """
         # Crear el grupo
         message = f"""<presence to='{room_name}@conference.{self.server}/{self.username}'>
         <x xmlns='http://jabber.org/protocol/muc'/>
@@ -559,6 +695,11 @@ class ManagerXMPP:
         print(f"Group chat {room_name} created.")
 
     def configure_group_chat(self, room_jid: str, config: dict):
+        """
+        Configure a group chat.
+        :param room_jid: The JID of the group chat.
+        :param config: The configuration of the group chat.
+        """
         # Configurar el grupo
         fields = "\n".join([f"<field var='{key}' type='hidden'><value>{value}</value></field>" for key, value in config.items()])
         
@@ -579,6 +720,12 @@ class ManagerXMPP:
         print(f"Configured group {room_jid}.")
 
     def add_people_to_group(self, room_jid: str, jid: str, reason: str = ""):
+        """
+        Add a person to a group.
+        :param room_jid: The JID of the group.
+        :param jid: The JID of the person.
+        :param reason: The reason for adding the person.
+        """
         # Añadir a la persona al grupo
         message = f"""<message to='{jid}@{self.server}' id="invite_{room_jid}{jid}">
             <x xmlns="jabber:x:conference" jid='{room_jid.lower()}@conference.{self.server}' />
@@ -588,6 +735,11 @@ class ManagerXMPP:
         print(f"Added {jid} to group {room_jid}.")
 
     def change_Precense(self, status_message: str, type: int):
+        """
+        Change the precense.
+        :param status_message: The status message.
+        :param type: The type of the status.
+        """
         """
         Types of status:
         1. Availible. 
