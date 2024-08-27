@@ -1,68 +1,67 @@
-# Proyecto de Chat XMPP
+# XMPP Chat Project
 
-Este proyecto es una implementación de un chat XMPP utilizando una API basada en WebSockets para la comunicación entre el cliente y el servidor.
+This project is an implementation of an XMPP chat using a WebSocket-based API for communication between the client and the server.
 
-## Requisitos
+## Requirements
 
-Para ejecutar el backend de la API, asegúrate de tener instalado `uvicorn`. Utiliza el siguiente comando para iniciar el servidor:
+To run the API backend, make sure you have `uvicorn` installed. Use the following command to start the server:
 
 ```bash
 uvicorn webtest:app --reload
 ```
 
-El archivo `requirements.txt` en el directorio raíz contiene las dependencias necesarias para el backend. Puedes instalar las dependencias ejecutando:
+The `requirements.txt` file in the root directory contains the necessary dependencies for the backend. You can install the dependencies by running:
 
 ```bash
 pip install -r requirements.txt
 ```
 
-## Estructura del Proyecto
+## Project Structure
 
-El proyecto está organizado en las siguientes carpetas:
+The project is organized into the following folders:
 
-- **frontend/**: Contiene el código fuente del frontend del chat, desarrollado en Next.js con TypeScript. Para trabajar en el frontend, usa Yarn como gestor de paquetes.
+- **frontend/**: Contains the source code of the chat frontend, developed in Next.js with TypeScript. Use Yarn as the package manager when working on the frontend.
 
-## Configuración del Frontend
+## Frontend Setup
 
-Para instalar las dependencias del frontend, navega al directorio `frontend` y ejecuta:
+To install the frontend dependencies, navigate to the `frontend` directory and run:
 
 ```bash
 yarn install
 ```
 
-Para iniciar el servidor de desarrollo del frontend, usa:
+To start the frontend development server, use:
 
 ```bash
 yarn dev
 ```
 
-## Implementación del Cliente XMPP
+## XMPP Client Implementation
 
-El cliente del lado del backend está implementado en Python y utiliza sockets para la comunicación. La clase `ManagerXMPP` maneja la conexión, autenticación, y operaciones de chat. 
+The backend-side client is implemented in Python and uses sockets for communication. The `ManagerXMPP` class handles the connection, authentication, and chat operations.
 
-### Funcionalidades Principales
+### Main Features
 
-- **Registro de Usuario**: Permite registrar un nuevo usuario en el servidor XMPP.
-- **Autenticación**: Maneja el proceso de autenticación utilizando TLS para asegurar la conexión.
-- **Envío y Recepción de Mensajes**: Permite enviar y recibir mensajes de chat en tiempo real.
-- **Gestión de Contactos**: Agrega, acepta y elimina contactos del roster.
-- **Obtención de Mensajes Históricos**: Recupera los mensajes archivados utilizando MAM (Message Archive Management).
+- **User Registration**: Allows registering a new user on the XMPP server.
+- **Authentication**: Manages the authentication process using TLS to secure the connection.
+- **Sending and Receiving Messages**: Enables real-time chat message sending and receiving.
+- **Contact Management**: Adds, accepts, and removes contacts from the roster.
+- **Retrieving Historical Messages**: Retrieves archived messages using MAM (Message Archive Management).
 
-### Ejecución del Cliente XMPP
+### Running the XMPP Client
 
-Para ejecutar el cliente XMPP, asegúrate de tener las dependencias necesarias instaladas. Luego, ejecuta tu script Python que usa la clase `ManagerXMPP` para interactuar con el servidor.
+To run the XMPP client, make sure you have the necessary dependencies installed. Then, run your Python script that uses the `ManagerXMPP` class to interact with the server.
 
-## Contribución
+## Contribution
 
-Si deseas contribuir a este proyecto, por favor sigue estos pasos:
+If you want to contribute to this project, please follow these steps:
 
-1. Realiza un fork del repositorio.
-2. Crea una rama para tu característica o corrección de errores (`git checkout -b feature/nueva-caracteristica`).
-3. Realiza tus cambios y confirma (`git commit -am 'Añadir nueva característica'`).
-4. Envía tus cambios (`git push origin feature/nueva-caracteristica`).
-5. Crea un Pull Request para revisión.
+1. Fork the repository.
+2. Create a branch for your feature or bug fix (`git checkout -b feature/new-feature`).
+3. Make your changes and commit them (`git commit -am 'Add new feature'`).
+4. Push your changes (`git push origin feature/new-feature`).
+5. Create a Pull Request for review.
 
-## Licencia
+## License
 
-Este proyecto está bajo la Licencia MIT. Consulta el archivo [LICENSE](LICENSE) para obtener más detalles.
-
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for more details.
